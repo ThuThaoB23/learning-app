@@ -66,6 +66,10 @@ public class AuthService {
                         "Invalid credentials"
                 ));
 
+        if (user.getDeletedAt() != null) {
+            throw new AppException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Invalid credentials");
+        }
+
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new AppException(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "Invalid credentials");
         }
