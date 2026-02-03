@@ -1,0 +1,23 @@
+CREATE TABLE users (
+    id CHAR(36) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    username VARCHAR(50) NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    avatar_url VARCHAR(500) NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'USER',
+    status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
+    locale VARCHAR(10) NULL,
+    time_zone VARCHAR(50) NULL,
+    daily_goal INT NULL,
+    preferences JSON NULL,
+    last_login_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_users_email (email),
+    UNIQUE KEY uk_users_username (username),
+    KEY idx_users_status (status),
+    KEY idx_users_deleted_at (deleted_at)
+) ENGINE=InnoDB;
