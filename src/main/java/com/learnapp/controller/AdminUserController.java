@@ -6,8 +6,13 @@ import com.learnapp.dto.RegisterRequest;
 import com.learnapp.dto.UserResponse;
 import com.learnapp.service.AuthService;
 import com.learnapp.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/admin/users")
 @PreAuthorize("hasRole('ADMIN')")
+@Tag(name = "Admin Users", description = "Admin user management APIs")
 public class AdminUserController {
 
     private final AuthService authService;
@@ -30,6 +36,15 @@ public class AdminUserController {
     public AdminUserController(AuthService authService, UserService userService) {
         this.authService = authService;
         this.userService = userService;
+    }
+
+    /**
+     * List users. Admin-only.
+     */
+    @Operation(summary = "List users", description = "List non-deleted users.")
+    @org.springframework.web.bind.annotation.GetMapping
+    public Page<UserResponse> listUsers(@ParameterObject Pageable pageable) {
+        return userService.listUsers(pageable);
     }
 
     /**

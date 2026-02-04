@@ -105,6 +105,13 @@ Response `200` (`UserResponse`)
 
 ## Admin Users (Admin)
 
+### `GET /admin/users`
+List users (non-deleted).
+
+Query: `page`, `size`, `sort`
+
+Response `200` (`Page<UserResponse>`)
+
 ### `POST /admin/users`
 Create user account.
 

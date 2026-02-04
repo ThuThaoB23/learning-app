@@ -10,6 +10,8 @@ import com.learnapp.error.AppException;
 import com.learnapp.repository.UserRepository;
 import java.util.Locale;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -62,6 +64,11 @@ public class UserService {
 
         user = userRepository.save(user);
         return UserMapper.toResponse(user);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<UserResponse> listUsers(Pageable pageable) {
+        return userRepository.findByDeletedAtIsNull(pageable).map(UserMapper::toResponse);
     }
 
     public UserResponse updateUser(UUID userId, AdminUpdateUserRequest request) {
