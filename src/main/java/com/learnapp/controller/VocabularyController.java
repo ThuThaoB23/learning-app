@@ -3,6 +3,7 @@ package com.learnapp.controller;
 import com.learnapp.dto.CreateVocabularyRequest;
 import com.learnapp.dto.VocabularyResponse;
 import com.learnapp.entities.Vocabulary;
+import com.learnapp.entities.VocabularyStatus;
 import com.learnapp.security.UserPrincipal;
 import com.learnapp.service.VocabularyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,9 +42,10 @@ public class VocabularyController {
             @RequestParam(required = false) String query,
             @RequestParam(required = false) UUID topicId,
             @RequestParam(required = false) String language,
+            @RequestParam(required = false) VocabularyStatus status,
             @ParameterObject Pageable pageable
     ) {
-        return vocabularyService.searchApproved(query, topicId, language, pageable).map(this::toResponse);
+        return vocabularyService.searchApproved(query, topicId, language, status, pageable).map(this::toResponse);
     }
 
     /**

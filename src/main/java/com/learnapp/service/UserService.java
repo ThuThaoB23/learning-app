@@ -5,10 +5,12 @@ import com.learnapp.dto.AdminUpdateUserRequest;
 import com.learnapp.dto.UpdateMeRequest;
 import com.learnapp.dto.UserResponse;
 import com.learnapp.entities.User;
+import com.learnapp.entities.UserRole;
 import com.learnapp.entities.UserStatus;
 import com.learnapp.error.AppException;
 import com.learnapp.repository.UserRepository;
 import java.util.Locale;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -67,8 +69,40 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public Page<UserResponse> listUsers(Pageable pageable) {
-        return userRepository.findByDeletedAtIsNull(pageable).map(UserMapper::toResponse);
+    public Page<UserResponse> listUsers(
+            String email,
+            String username,
+            String displayName,
+            UserRole role,
+            UserStatus status,
+            Pageable pageable
+    ) {
+        return userRepository.searchUsers(
+                normalizeSearch(email),
+                normalizeSearch(username),
+                normalizeSearch(displayName),
+                role,
+                status,
+                pageable
+        ).map(UserMapper::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserResponse> exportUsers(
+            String email,
+            String username,
+            String displayName,
+            UserRole role,
+            UserStatus status
+    ) {
+        return userRepository.searchUsers(
+                normalizeSearch(email),
+                normalizeSearch(username),
+                normalizeSearch(displayName),
+                role,
+                status,
+                Pageable.unpaged()
+        ).map(UserMapper::toResponse).getContent();
     }
 
     public UserResponse updateUser(UUID userId, AdminUpdateUserRequest request) {
@@ -147,6 +181,14 @@ public class UserService {
 
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeSearch(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim().toLowerCase(Locale.ROOT);
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private void ensureNotDeleted(User user) {

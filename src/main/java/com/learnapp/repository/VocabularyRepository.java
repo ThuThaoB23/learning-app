@@ -40,12 +40,24 @@ public interface    VocabularyRepository extends JpaRepository<Vocabulary, UUID>
             Pageable pageable
     );
 
+    Page<Vocabulary> findByDeletedAtIsNull(Pageable pageable);
+
+    Page<Vocabulary> findByDeletedAtIsNullAndLanguage(String language, Pageable pageable);
+
+    Page<Vocabulary> findByDeletedAtIsNullAndTermNormalizedContainingIgnoreCase(String termNormalized, Pageable pageable);
+
+    Page<Vocabulary> findByDeletedAtIsNullAndLanguageAndTermNormalizedContainingIgnoreCase(
+            String language,
+            String termNormalized,
+            Pageable pageable
+    );
+
     @Query("""
             select v
             from Vocabulary v
             join TopicVocabulary tv on tv.vocabularyId = v.id
             where tv.topicId = :topicId
-              and v.status = :status
+              and (:status is null or v.status = :status)
               and v.deletedAt is null
               and (:language is null or v.language = :language)
               and (:termNormalized is null or v.termNormalized like concat('%', :termNormalized, '%'))

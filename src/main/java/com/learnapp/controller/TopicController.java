@@ -4,6 +4,7 @@ import com.learnapp.dto.TopicResponse;
 import com.learnapp.dto.VocabularyResponse;
 import com.learnapp.entities.Topic;
 import com.learnapp.entities.Vocabulary;
+import com.learnapp.entities.VocabularyStatus;
 import com.learnapp.service.TopicService;
 import com.learnapp.service.VocabularyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,8 +37,15 @@ public class TopicController {
      */
     @Operation(summary = "List topics", description = "List active vocabulary topics.")
     @GetMapping
-    public Page<TopicResponse> listTopics(@ParameterObject Pageable pageable) {
-        return topicService.listActive(pageable).map(this::toTopicResponse);
+    public Page<TopicResponse> listTopics(
+            @RequestParam(required = false) String query,
+            @ParameterObject Pageable pageable
+    ) {
+        System.out.println(query);
+        if (query == null || query.trim().isEmpty()) {
+            return topicService.listActive(pageable).map(this::toTopicResponse);
+        }
+        return topicService.searchTopics(query, query, com.learnapp.entities.TopicStatus.ACTIVE, pageable);
     }
 
     /**
@@ -58,9 +66,10 @@ public class TopicController {
             @PathVariable UUID id,
             @RequestParam(required = false) String query,
             @RequestParam(required = false) String language,
+            @RequestParam(required = false) VocabularyStatus status,
             @ParameterObject Pageable pageable
     ) {
-        return vocabularyService.searchApproved(query, id, language, pageable).map(this::toVocabularyResponse);
+        return vocabularyService.searchApproved(query, id, language, status, pageable).map(this::toVocabularyResponse);
     }
 
     private TopicResponse toTopicResponse(Topic topic) {

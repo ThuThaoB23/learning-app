@@ -44,6 +44,7 @@ public class VocabularyService {
             String query,
             UUID topicId,
             String language,
+            VocabularyStatus status,
             Pageable pageable
     ) {
         String normalizedQuery = normalizeTerm(query);
@@ -52,16 +53,44 @@ public class VocabularyService {
         if (topicId != null) {
             return vocabularyRepository.searchByTopic(
                     topicId,
-                    VocabularyStatus.APPROVED,
+                    status,
                     normalizedLanguage,
                     normalizedQuery,
                     pageable
             );
         }
 
-        if (normalizedQuery != null && normalizedLanguage != null) {
+        if (status != null && normalizedQuery != null && normalizedLanguage != null) {
             return vocabularyRepository.findByStatusAndDeletedAtIsNullAndLanguageAndTermNormalizedContainingIgnoreCase(
-                    VocabularyStatus.APPROVED,
+                    status,
+                    normalizedLanguage,
+                    normalizedQuery,
+                    pageable
+            );
+        }
+
+        if (status != null && normalizedQuery != null) {
+            return vocabularyRepository.findByStatusAndDeletedAtIsNullAndTermNormalizedContainingIgnoreCase(
+                    status,
+                    normalizedQuery,
+                    pageable
+            );
+        }
+
+        if (status != null && normalizedLanguage != null) {
+            return vocabularyRepository.findByStatusAndDeletedAtIsNullAndLanguage(
+                    status,
+                    normalizedLanguage,
+                    pageable
+            );
+        }
+
+        if (status != null) {
+            return vocabularyRepository.findByStatusAndDeletedAtIsNull(status, pageable);
+        }
+
+        if (normalizedQuery != null && normalizedLanguage != null) {
+            return vocabularyRepository.findByDeletedAtIsNullAndLanguageAndTermNormalizedContainingIgnoreCase(
                     normalizedLanguage,
                     normalizedQuery,
                     pageable
@@ -69,22 +98,20 @@ public class VocabularyService {
         }
 
         if (normalizedQuery != null) {
-            return vocabularyRepository.findByStatusAndDeletedAtIsNullAndTermNormalizedContainingIgnoreCase(
-                    VocabularyStatus.APPROVED,
+            return vocabularyRepository.findByDeletedAtIsNullAndTermNormalizedContainingIgnoreCase(
                     normalizedQuery,
                     pageable
             );
         }
 
         if (normalizedLanguage != null) {
-            return vocabularyRepository.findByStatusAndDeletedAtIsNullAndLanguage(
-                    VocabularyStatus.APPROVED,
+            return vocabularyRepository.findByDeletedAtIsNullAndLanguage(
                     normalizedLanguage,
                     pageable
             );
         }
 
-        return vocabularyRepository.findByStatusAndDeletedAtIsNull(VocabularyStatus.APPROVED, pageable);
+        return vocabularyRepository.findByDeletedAtIsNull(pageable);
     }
 
     @Transactional(readOnly = true)

@@ -106,11 +106,29 @@ Response `200` (`UserResponse`)
 ## Admin Users (Admin)
 
 ### `GET /admin/users`
-List users (non-deleted).
+Search users (non-deleted).
 
-Query: `page`, `size`, `sort`
+Query:
+- `email` (optional, partial)
+- `username` (optional, partial)
+- `displayName` (optional, partial)
+- `role` (optional: `USER|ADMIN`)
+- `status` (optional: `ACTIVE|INACTIVE|BANNED|PENDING_VERIFICATION`)
+- `page`, `size`, `sort`
 
 Response `200` (`Page<UserResponse>`)
+
+### `GET /admin/users/export`
+Export users to CSV (same filters as search).
+
+Query:
+- `email` (optional, partial)
+- `username` (optional, partial)
+- `displayName` (optional, partial)
+- `role` (optional: `USER|ADMIN`)
+- `status` (optional: `ACTIVE|INACTIVE|BANNED|PENDING_VERIFICATION`)
+
+Response `200` (`text/csv`) with `Content-Disposition: attachment; filename="users.csv"`
 
 ### `POST /admin/users`
 Create user account.
@@ -168,7 +186,9 @@ Response `200` (`UserResponse`)
 ### `GET /topics` (Auth)
 List active topics.
 
-Query: `page`, `size`, `sort`
+Query:
+- `query` (optional: name or slug, partial)
+- `page`, `size`, `sort`
 
 Response `200` (`Page<TopicResponse>`)
 
@@ -183,9 +203,67 @@ List approved vocabularies in a topic.
 Query:
 - `query` (optional)
 - `language` (optional)
+- `status` (optional: `PENDING|APPROVED|REJECTED`)
 - `page`, `size`, `sort`
 
 Response `200` (`Page<VocabularyResponse>`)
+
+---
+
+## Admin Topics (Admin)
+
+### `GET /admin/topics`
+Search topics (non-deleted).
+
+Query:
+- `name` (optional, partial)
+- `slug` (optional, partial)
+- `status` (optional: `ACTIVE|INACTIVE`)
+- `page`, `size`, `sort`
+
+Response `200` (`Page<TopicResponse>`)
+
+### `GET /admin/topics/export`
+Export topics to CSV (same filters as search).
+
+Query:
+- `name` (optional, partial)
+- `slug` (optional, partial)
+- `status` (optional: `ACTIVE|INACTIVE`)
+
+Response `200` (`text/csv`) with `Content-Disposition: attachment; filename="topics.csv"`
+
+### `POST /admin/topics`
+Create topic.
+
+Body (`CreateTopicRequest`):
+```json
+{
+  "name": "Basic English",
+  "description": "Common words for beginners"
+}
+```
+
+Response `200` (`TopicResponse`)
+
+### `PATCH /admin/topics/{id}`
+Update topic.
+
+Body (`UpdateTopicRequest`):
+```json
+{
+  "name": "Basic English",
+  "description": "Updated description",
+  "status": "ACTIVE"
+}
+```
+
+Response `200` (`TopicResponse`)
+
+### `DELETE /admin/topics/{id}`
+Soft delete topic.
+
+Response `204 No Content`
 
 ---
 
@@ -198,6 +276,7 @@ Query:
 - `query` (optional)
 - `topicId` (optional)
 - `language` (optional)
+- `status` (optional: `PENDING|APPROVED|REJECTED`)
 - `page`, `size`, `sort`
 
 Response `200` (`Page<VocabularyResponse>`)
