@@ -2,13 +2,15 @@ package com.learnapp.dto;
 
 import com.learnapp.entities.VocabularyStatus;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public record VocabularyResponse(
         UUID id,
         String term,
         String definition,
-        String example,
+        String definitionVi,
+        List<String> examples,
         String phonetic,
         String partOfSpeech,
         String language,

@@ -280,11 +280,13 @@ Query:
 - `page`, `size`, `sort`
 
 Response `200` (`Page<VocabularyResponse>`)
+Note: `VocabularyResponse` includes `definitionVi` and `examples: [string]`.
 
 ### `GET /vocab/{id}` (Auth)
 Get approved vocabulary by id.
 
 Response `200` (`VocabularyResponse`)
+Note: `VocabularyResponse` includes `definitionVi` and `examples: [string]`.
 
 ### `POST /vocab/contributions` (Auth)
 Submit a new vocabulary contribution (PENDING).
@@ -294,7 +296,8 @@ Body (`CreateVocabularyRequest`):
 {
   "term": "apple",
   "definition": "A fruit...",
-  "example": "I eat an apple.",
+  "definitionVi": "Một loại trái cây...",
+  "examples": ["I eat an apple.", "Apple is tasty."],
   "phonetic": "ˈæp.əl",
   "partOfSpeech": "noun",
   "language": "en",
@@ -351,6 +354,24 @@ Response `204 No Content`
 
 ## Admin Vocabulary (Admin)
 
+### `PATCH /admin/vocab/{id}`
+Update vocabulary fields.
+
+Body (`UpdateVocabularyRequest`):
+```json
+{
+  "term": "apple",
+  "definition": "A fruit...",
+  "definitionVi": "Một loại trái cây...",
+  "phonetic": "ˈæp.əl",
+  "partOfSpeech": "noun",
+  "language": "en",
+  "status": "APPROVED"
+}
+```
+
+Response `200` (`VocabularyResponse`)
+
 ### `PATCH /admin/vocab/{id}/approve`
 Approve pending vocabulary.
 
@@ -360,3 +381,8 @@ Response `200` (`VocabularyResponse`)
 Reject pending vocabulary.
 
 Response `200` (`VocabularyResponse`)
+
+### `DELETE /admin/vocab/{id}`
+Soft delete vocabulary.
+
+Response `204 No Content`

@@ -59,8 +59,8 @@ public class Vocabulary {
     @Column(name = "definition", nullable = false, columnDefinition = "text")
     private String definition;
 
-    @Column(name = "example", columnDefinition = "text")
-    private String example;
+    @Column(name = "definition_vi", columnDefinition = "text")
+    private String definitionVi;
 
     @Column(name = "phonetic", length = 100)
     private String phonetic;

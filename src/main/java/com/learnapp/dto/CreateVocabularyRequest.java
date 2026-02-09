@@ -8,7 +8,8 @@ import java.util.UUID;
 public record CreateVocabularyRequest(
         @NotBlank @Size(max = 255) String term,
         @NotBlank String definition,
-        @Size(max = 2000) String example,
+        @Size(max = 4000) String definitionVi,
+        java.util.List<@Size(max = 2000) String> examples,
         @Size(max = 100) String phonetic,
         @Size(max = 50) String partOfSpeech,
         @NotBlank @Size(max = 10) String language,

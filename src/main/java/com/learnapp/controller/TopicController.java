@@ -3,7 +3,6 @@ package com.learnapp.controller;
 import com.learnapp.dto.TopicResponse;
 import com.learnapp.dto.VocabularyResponse;
 import com.learnapp.entities.Topic;
-import com.learnapp.entities.Vocabulary;
 import com.learnapp.entities.VocabularyStatus;
 import com.learnapp.service.TopicService;
 import com.learnapp.service.VocabularyService;
@@ -69,7 +68,7 @@ public class TopicController {
             @RequestParam(required = false) VocabularyStatus status,
             @ParameterObject Pageable pageable
     ) {
-        return vocabularyService.searchApproved(query, id, language, status, pageable).map(this::toVocabularyResponse);
+        return vocabularyService.searchApproved(query, id, language, status, pageable);
     }
 
     private TopicResponse toTopicResponse(Topic topic) {
@@ -82,18 +81,4 @@ public class TopicController {
         );
     }
 
-    private VocabularyResponse toVocabularyResponse(Vocabulary vocabulary) {
-        return new VocabularyResponse(
-                vocabulary.getId(),
-                vocabulary.getTerm(),
-                vocabulary.getDefinition(),
-                vocabulary.getExample(),
-                vocabulary.getPhonetic(),
-                vocabulary.getPartOfSpeech(),
-                vocabulary.getLanguage(),
-                vocabulary.getStatus(),
-                vocabulary.getCreatedBy(),
-                vocabulary.getCreatedAt()
-        );
-    }
 }

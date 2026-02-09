@@ -1,14 +1,18 @@
 package com.learnapp.controller;
 
+import com.learnapp.dto.UpdateVocabularyRequest;
 import com.learnapp.dto.VocabularyResponse;
-import com.learnapp.entities.Vocabulary;
 import com.learnapp.service.VocabularyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.UUID;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,7 +34,7 @@ public class AdminVocabularyController {
     @Operation(summary = "Approve vocab", description = "Approve a pending vocabulary contribution.")
     @PatchMapping("/{id}/approve")
     public VocabularyResponse approve(@PathVariable UUID id) {
-        return toResponse(vocabularyService.approve(id));
+        return vocabularyService.approve(id);
     }
 
     /**
@@ -39,21 +43,25 @@ public class AdminVocabularyController {
     @Operation(summary = "Reject vocab", description = "Reject a pending vocabulary contribution.")
     @PatchMapping("/{id}/reject")
     public VocabularyResponse reject(@PathVariable UUID id) {
-        return toResponse(vocabularyService.reject(id));
+        return vocabularyService.reject(id);
     }
 
-    private VocabularyResponse toResponse(Vocabulary vocabulary) {
-        return new VocabularyResponse(
-                vocabulary.getId(),
-                vocabulary.getTerm(),
-                vocabulary.getDefinition(),
-                vocabulary.getExample(),
-                vocabulary.getPhonetic(),
-                vocabulary.getPartOfSpeech(),
-                vocabulary.getLanguage(),
-                vocabulary.getStatus(),
-                vocabulary.getCreatedBy(),
-                vocabulary.getCreatedAt()
-        );
+    /**
+     * Update a vocabulary entry.
+     */
+    @Operation(summary = "Update vocab", description = "Update vocabulary fields.")
+    @PatchMapping("/{id}")
+    public VocabularyResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateVocabularyRequest request) {
+        return vocabularyService.updateVocabulary(id, request);
+    }
+
+    /**
+     * Delete a vocabulary entry (soft delete).
+     */
+    @Operation(summary = "Delete vocab", description = "Soft delete a vocabulary entry.")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        vocabularyService.deleteVocabulary(id);
+        return ResponseEntity.noContent().build();
     }
 }

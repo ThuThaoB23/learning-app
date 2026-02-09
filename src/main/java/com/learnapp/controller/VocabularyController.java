@@ -2,7 +2,6 @@ package com.learnapp.controller;
 
 import com.learnapp.dto.CreateVocabularyRequest;
 import com.learnapp.dto.VocabularyResponse;
-import com.learnapp.entities.Vocabulary;
 import com.learnapp.entities.VocabularyStatus;
 import com.learnapp.security.UserPrincipal;
 import com.learnapp.service.VocabularyService;
@@ -45,7 +44,7 @@ public class VocabularyController {
             @RequestParam(required = false) VocabularyStatus status,
             @ParameterObject Pageable pageable
     ) {
-        return vocabularyService.searchApproved(query, topicId, language, status, pageable).map(this::toResponse);
+        return vocabularyService.searchApproved(query, topicId, language, status, pageable);
     }
 
     /**
@@ -54,7 +53,7 @@ public class VocabularyController {
     @Operation(summary = "Get vocab", description = "Get a single approved vocabulary by id.")
     @GetMapping("/{id}")
     public VocabularyResponse getById(@PathVariable UUID id) {
-        return toResponse(vocabularyService.getApproved(id));
+        return vocabularyService.getApproved(id);
     }
 
     /**
@@ -66,31 +65,16 @@ public class VocabularyController {
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody CreateVocabularyRequest request
     ) {
-        Vocabulary vocabulary = vocabularyService.createContribution(
+        return vocabularyService.createContribution(
                 principal.id(),
                 request.term(),
                 request.definition(),
-                request.example(),
+                request.definitionVi(),
+                request.examples(),
                 request.phonetic(),
                 request.partOfSpeech(),
                 request.language(),
                 request.topicIds()
-        );
-        return toResponse(vocabulary);
-    }
-
-    private VocabularyResponse toResponse(Vocabulary vocabulary) {
-        return new VocabularyResponse(
-                vocabulary.getId(),
-                vocabulary.getTerm(),
-                vocabulary.getDefinition(),
-                vocabulary.getExample(),
-                vocabulary.getPhonetic(),
-                vocabulary.getPartOfSpeech(),
-                vocabulary.getLanguage(),
-                vocabulary.getStatus(),
-                vocabulary.getCreatedBy(),
-                vocabulary.getCreatedAt()
         );
     }
 }
