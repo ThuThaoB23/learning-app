@@ -1,0 +1,21 @@
+package com.learnapp.dto;
+
+import com.learnapp.entities.VocabularyStatus;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+public record VocabularyDetailResponse(
+        UUID id,
+        String term,
+        String definition,
+        String definitionVi,
+        List<String> examples,
+        String phonetic,
+        String partOfSpeech,
+        String language,
+        VocabularyStatus status,
+        UUID createdBy,
+        LocalDateTime createdAt,
+        List<UUID> topicIds
+) {}

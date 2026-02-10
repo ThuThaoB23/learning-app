@@ -1,0 +1,101 @@
+﻿term,definition,definitionVi,examples,phonetic,partOfSpeech,language,topics,status
+dog,A domesticated animal commonly kept as a pet,Con chó,I see a dog.|The dog is an animal.,/dɔːɡ/,noun,en,animals,APPROVED
+cat,A small domesticated animal with soft fur,Con mèo,I see a cat.|The cat is an animal.,/kæt/,noun,en,animals,APPROVED
+bird,An animal with feathers and wings,Con chim,I see a bird.|The bird is an animal.,/bɝːd/,noun,en,animals,APPROVED
+fish,An animal that lives in water,Con cá,I see a fish.|The fish is an animal.,/fɪʃ/,noun,en,animals,APPROVED
+cow,A farm animal raised for milk,Con bò,I see a cow.|The cow is an animal.,/kaʊ/,noun,en,animals,APPROVED
+pig,A farm animal with a round body,Con heo,I see a pig.|The pig is an animal.,/pɪɡ/,noun,en,animals,APPROVED
+chicken,A bird raised for meat and eggs,Con gà,I see a chicken.|The chicken is an animal.,/ˈtʃɪkɪn/,noun,en,animals,APPROVED
+duck,A water bird with a flat beak,Con vịt,I see a duck.|The duck is an animal.,/dʌk/,noun,en,animals,APPROVED
+goose,A large water bird,Con ngỗng,I see a goose.|The goose is an animal.,/ɡuːs/,noun,en,animals,APPROVED
+turkey,A large bird often eaten as food,Gà tây,I see a turkey.|The turkey is an animal.,/ˈtɝːki/,noun,en,animals,APPROVED
+horse,A strong animal used for riding,Con ngựa,I see a horse.|The horse is an animal.,/hɔːrs/,noun,en,animals,APPROVED
+donkey,A hardworking animal similar to a small horse,Con lừa,I see a donkey.|The donkey is an animal.,/ˈdɑːŋki/,noun,en,animals,APPROVED
+mule,An animal that is a mix of a horse and a donkey,Con la,I see a mule.|The mule is an animal.,/mjuːl/,noun,en,animals,APPROVED
+sheep,A farm animal raised for wool,Con cừu,I see a sheep.|The sheep is an animal.,/ʃiːp/,noun,en,animals,APPROVED
+goat,A farm animal with horns,Con dê,I see a goat.|The goat is an animal.,/ɡoʊt/,noun,en,animals,APPROVED
+rabbit,A small animal with long ears,Con thỏ,I see a rabbit.|The rabbit is an animal.,/ˈræbɪt/,noun,en,animals,APPROVED
+hamster,A small pet rodent,Chuột hamster,I see a hamster.|The hamster is an animal.,/ˈhæmstər/,noun,en,animals,APPROVED
+guinea pig,A small pet rodent,Chuột lang,I see a guinea pig.|The guinea pig is an animal.,/ˈɡɪni pɪɡ/,noun,en,animals,APPROVED
+mouse,A small rodent,Chuột,I see a mouse.|The mouse is an animal.,/maʊs/,noun,en,animals,APPROVED
+rat,A large rodent,Chuột cống,I see a rat.|The rat is an animal.,/ræt/,noun,en,animals,APPROVED
+squirrel,An animal that lives in trees,Con sóc,I see a squirrel.|The squirrel is an animal.,/ˈskwɝːəl/,noun,en,animals,APPROVED
+hedgehog,A small animal with spines,Nhím (nhỏ),I see a hedgehog.|The hedgehog is an animal.,/ˈhɛdʒˌhɔːɡ/,noun,en,animals,APPROVED
+porcupine,A large animal with sharp quills,Nhím gai,I see a porcupine.|The porcupine is an animal.,/ˈpɔːrkjəˌpaɪn/,noun,en,animals,APPROVED
+bat,A flying mammal,Dơi,I see a bat.|The bat is an animal.,/bæt/,noun,en,animals,APPROVED
+bear,A large animal with thick fur,Gấu,I see a bear.|The bear is an animal.,/bɛr/,noun,en,animals,APPROVED
+panda,A bear that eats bamboo,Gấu trúc,I see a panda.|The panda is an animal.,/ˈpændə/,noun,en,animals,APPROVED
+koala,An animal that lives in trees,Gấu koala,I see a koala.|The koala is an animal.,/koʊˈɑːlə/,noun,en,animals,APPROVED
+kangaroo,An animal that jumps,Chuột túi,I see a kangaroo.|The kangaroo is an animal.,/ˌkæŋɡəˈruː/,noun,en,animals,APPROVED
+lion,A large wild cat,Sư tử,I see a lion.|The lion is an animal.,/ˈlaɪən/,noun,en,animals,APPROVED
+tiger,A large wild cat with stripes,Hổ,I see a tiger.|The tiger is an animal.,/ˈtaɪɡər/,noun,en,animals,APPROVED
+leopard,A fast wild cat with spots,Báo hoa mai,I see a leopard.|The leopard is an animal.,/ˈlɛpərd/,noun,en,animals,APPROVED
+cheetah,The fastest land animal,Báo săn,I see a cheetah.|The cheetah is an animal.,/ˈtʃiːtə/,noun,en,animals,APPROVED
+jaguar,A large wild cat from the Americas,Báo đốm (jaguar),I see a jaguar.|The jaguar is an animal.,/ˈdʒæɡwɑːr/,noun,en,animals,APPROVED
+panther,A large wild cat (often black),Báo đen,I see a panther.|The panther is an animal.,/ˈpænθər/,noun,en,animals,APPROVED
+cougar,A large wild cat; puma,Sư tử núi,I see a cougar.|The cougar is an animal.,/ˈkuːɡər/,noun,en,animals,APPROVED
+lynx,A wild cat with tufted ears,Mèo rừng (lynx),I see a lynx.|The lynx is an animal.,/lɪŋks/,noun,en,animals,APPROVED
+bobcat,A North American wild cat,Mèo rừng Bắc Mỹ,I see a bobcat.|The bobcat is an animal.,/ˈbɑːbˌkæt/,noun,en,animals,APPROVED
+wolf,A wild animal related to dogs,Sói,I see a wolf.|The wolf is an animal.,/wʊlf/,noun,en,animals,APPROVED
+fox,A small wild animal with a bushy tail,Cáo,I see a fox.|The fox is an animal.,/fɑːks/,noun,en,animals,APPROVED
+deer,A wild animal with long legs,Hươu,I see a deer.|The deer is an animal.,/dɪr/,noun,en,animals,APPROVED
+elk,A large deer,Hươu nai (elk),I see a elk.|The elk is an animal.,/ɛlk/,noun,en,animals,APPROVED
+moose,A very large deer,Nai sừng tấm,I see a moose.|The moose is an animal.,/muːs/,noun,en,animals,APPROVED
+reindeer,A deer that lives in cold regions,Tuần lộc,I see a reindeer.|The reindeer is an animal.,/ˈreɪnˌdɪr/,noun,en,animals,APPROVED
+antelope,A fast animal similar to a deer,Linh dương,I see a antelope.|The antelope is an animal.,/ˈæntəˌloʊp/,noun,en,animals,APPROVED
+gazelle,A small fast antelope,Linh dương gazelle,I see a gazelle.|The gazelle is an animal.,/ɡəˈzɛl/,noun,en,animals,APPROVED
+zebra,An animal with black and white stripes,Ngựa vằn,I see a zebra.|The zebra is an animal.,/ˈziːbrə/,noun,en,animals,APPROVED
+giraffe,A very tall animal,Hươu cao cổ,I see a giraffe.|The giraffe is an animal.,/dʒəˈræf/,noun,en,animals,APPROVED
+elephant,A very large animal with a trunk,Voi,I see a elephant.|The elephant is an animal.,/ˈɛlɪfənt/,noun,en,animals,APPROVED
+rhinoceros,A large animal with one or two horns,Tê giác,I see a rhinoceros.|The rhinoceros is an animal.,/raɪˈnɑːsərəs/,noun,en,animals,APPROVED
+hippopotamus,A large animal that lives near rivers,Hà mã,I see a hippopotamus.|The hippopotamus is an animal.,/ˌhɪpəˈpɑːtəməs/,noun,en,animals,APPROVED
+camel,An animal that lives in deserts,Lạc đà,I see a camel.|The camel is an animal.,/ˈkæməl/,noun,en,animals,APPROVED
+llama,A South American pack animal,Lạc đà không bướu (llama),I see a llama.|The llama is an animal.,/ˈlɑːmə/,noun,en,animals,APPROVED
+alpaca,An animal similar to a llama,Alpaca,I see a alpaca.|The alpaca is an animal.,/ælˈpækə/,noun,en,animals,APPROVED
+buffalo,A large animal with horns,Trâu rừng / trâu,I see a buffalo.|The buffalo is an animal.,/ˈbʌfəˌloʊ/,noun,en,animals,APPROVED
+bison,A large wild buffalo,Bò rừng bizon,I see a bison.|The bison is an animal.,/ˈbaɪsən/,noun,en,animals,APPROVED
+yak,A long-haired animal from the Himalayas,Bò Tây Tạng (yak),I see a yak.|The yak is an animal.,/jæk/,noun,en,animals,APPROVED
+monkey,An intelligent animal that climbs trees,Khỉ,I see a monkey.|The monkey is an animal.,/ˈmʌŋki/,noun,en,animals,APPROVED
+ape,A large primate,Vượn,I see a ape.|The ape is an animal.,/eɪp/,noun,en,animals,APPROVED
+gorilla,A very large ape,Khỉ đột,I see a gorilla.|The gorilla is an animal.,/ɡəˈrɪlə/,noun,en,animals,APPROVED
+chimpanzee,A highly intelligent ape,Tinh tinh,I see a chimpanzee.|The chimpanzee is an animal.,/ˌtʃɪmpænˈziː/,noun,en,animals,APPROVED
+orangutan,A large orange ape,Đười ươi,I see a orangutan.|The orangutan is an animal.,/ɔːˈræŋəˌtæn/,noun,en,animals,APPROVED
+lemur,A small primate with a long tail,Vượn cáo,I see a lemur.|The lemur is an animal.,/ˈliːmər/,noun,en,animals,APPROVED
+meerkat,A small animal that stands upright,Chồn meerkat,I see a meerkat.|The meerkat is an animal.,/ˈmɪrˌkæt/,noun,en,animals,APPROVED
+mongoose,A small animal that hunts snakes,Cầy mangut,I see a mongoose.|The mongoose is an animal.,/ˈmɑːŋɡuːs/,noun,en,animals,APPROVED
+otter,An animal that swims well,Rái cá,I see a otter.|The otter is an animal.,/ˈɑːtər/,noun,en,animals,APPROVED
+beaver,An animal that builds dams,Hải ly,I see a beaver.|The beaver is an animal.,/ˈbiːvər/,noun,en,animals,APPROVED
+raccoon,An animal with a mask-like face,Gấu mèo,I see a raccoon.|The raccoon is an animal.,/rəˈkuːn/,noun,en,animals,APPROVED
+skunk,An animal that sprays a bad smell,Chồn hôi,I see a skunk.|The skunk is an animal.,/skʌŋk/,noun,en,animals,APPROVED
+badger,A digging animal with a strong body,Lửng,I see a badger.|The badger is an animal.,/ˈbædʒər/,noun,en,animals,APPROVED
+weasel,A small long-bodied animal,Chồn (weasel),I see a weasel.|The weasel is an animal.,/ˈwiːzəl/,noun,en,animals,APPROVED
+ferret,A small domesticated weasel-like animal,Chồn sương,I see a ferret.|The ferret is an animal.,/ˈfɛrɪt/,noun,en,animals,APPROVED
+mink,A small animal with soft fur,Chồn mink,I see a mink.|The mink is an animal.,/mɪŋk/,noun,en,animals,APPROVED
+wolverine,A strong wild animal in the weasel family,Chồn gulo,I see a wolverine.|The wolverine is an animal.,/ˈwʊlvəˌriːn/,noun,en,animals,APPROVED
+armadillo,An animal with a hard shell-like armor,Tatu,I see a armadillo.|The armadillo is an animal.,/ˌɑːrməˈdɪloʊ/,noun,en,animals,APPROVED
+sloth,A very slow tree animal,Con lười,I see a sloth.|The sloth is an animal.,/sloʊθ/,noun,en,animals,APPROVED
+anteater,An animal that eats ants,Thú ăn kiến,I see a anteater.|The anteater is an animal.,/ˈæntˌiːtər/,noun,en,animals,APPROVED
+tapir,A large animal with a short trunk-like nose,Heo vòi,I see a tapir.|The tapir is an animal.,/təˈpɪr/,noun,en,animals,APPROVED
+boar,A wild pig,Heo rừng,I see a boar.|The boar is an animal.,/bɔːr/,noun,en,animals,APPROVED
+ox,A strong farm animal used for work,Bò đực kéo,I see a ox.|The ox is an animal.,/ɑːks/,noun,en,animals,APPROVED
+snake,A long animal with no legs,Rắn,I see a snake.|The snake is an animal.,/sneɪk/,noun,en,animals,APPROVED
+lizard,A reptile with four legs,Thằn lằn,I see a lizard.|The lizard is an animal.,/ˈlɪzərd/,noun,en,animals,APPROVED
+iguana,A large tropical lizard,Cự đà,I see a iguana.|The iguana is an animal.,/ɪˈɡwɑːnə/,noun,en,animals,APPROVED
+chameleon,A lizard that can change color,Tắc kè hoa,I see a chameleon.|The chameleon is an animal.,/kəˈmiːliən/,noun,en,animals,APPROVED
+crocodile,A large reptile that lives near water,Cá sấu,I see a crocodile.|The crocodile is an animal.,/ˈkrɑːkəˌdaɪl/,noun,en,animals,APPROVED
+alligator,A reptile similar to a crocodile,Cá sấu Mỹ,I see a alligator.|The alligator is an animal.,/ˈælɪˌɡeɪtər/,noun,en,animals,APPROVED
+turtle,A reptile with a hard shell,Rùa,I see a turtle.|The turtle is an animal.,/ˈtʃɝːtəl/,noun,en,animals,APPROVED
+tortoise,A land turtle,Rùa cạn,I see a tortoise.|The tortoise is an animal.,/ˈtɔːrtəs/,noun,en,animals,APPROVED
+frog,An animal that lives on land and water,Ếch,I see a frog.|The frog is an animal.,/frɔːɡ/,noun,en,animals,APPROVED
+toad,A type of frog,Cóc,I see a toad.|The toad is an animal.,/toʊd/,noun,en,animals,APPROVED
+salamander,An amphibian with a long tail,Kỳ giông,I see a salamander.|The salamander is an animal.,/ˈsæləˌmændər/,noun,en,animals,APPROVED
+newt,A small salamander,Sa giông,I see a newt.|The newt is an animal.,/nuːt/,noun,en,animals,APPROVED
+whale,A very large sea animal,Cá voi,I see a whale.|The whale is an animal.,/weɪl/,noun,en,animals,APPROVED
+dolphin,A very intelligent sea mammal,Cá heo,I see a dolphin.|The dolphin is an animal.,/ˈdɑːlfɪn/,noun,en,animals,APPROVED
+shark,A large sea fish with sharp teeth,Cá mập,I see a shark.|The shark is an animal.,/ʃɑːrk/,noun,en,animals,APPROVED
+jellyfish,A sea animal with a soft body and tentacles,Sứa,I see a jellyfish.|The jellyfish is an animal.,/ˈdʒɛliˌfɪʃ/,noun,en,animals,APPROVED
+starfish,A sea animal shaped like a star,Sao biển,I see a starfish.|The starfish is an animal.,/ˈstɑːrˌfɪʃ/,noun,en,animals,APPROVED
+seahorse,A small fish shaped like a horse,Cá ngựa,I see a seahorse.|The seahorse is an animal.,/ˈsiːˌhɔːrs/,noun,en,animals,APPROVED
+octopus,A sea animal with eight arms,Bạch tuộc,I see a octopus.|The octopus is an animal.,/ˈɑːktəpəs/,noun,en,animals,APPROVED
+squid,A sea animal similar to an octopus,Mực,I see a squid.|The squid is an animal.,/skwɪd/,noun,en,animals,APPROVED
+crab,A sea animal with claws,Cua,I see a crab.|The crab is an animal.,/kræb/,noun,en,animals,APPROVED

@@ -10,4 +10,6 @@ public interface TopicVocabularyRepository extends JpaRepository<TopicVocabulary
     boolean existsByTopicIdAndVocabularyId(UUID topicId, UUID vocabularyId);
 
     List<TopicVocabulary> findByTopicId(UUID topicId);
+
+    List<TopicVocabulary> findByVocabularyId(UUID vocabularyId);
 }

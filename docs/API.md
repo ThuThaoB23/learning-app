@@ -354,6 +354,35 @@ Response `204 No Content`
 
 ## Admin Vocabulary (Admin)
 
+### `GET /admin/vocab`
+Search vocabularies for moderation.
+
+Query:
+- `query` (optional)
+- `topicId` (optional)
+- `language` (optional)
+- `status` (optional: `PENDING|APPROVED|REJECTED`)
+- `page`, `size`, `sort`
+
+Response `200` (`Page<VocabularyResponse>`)
+
+### `GET /admin/vocab/export`
+Export vocabularies to CSV (same filters as search).
+
+Query:
+- `query` (optional)
+- `topicId` (optional)
+- `language` (optional)
+- `status` (optional: `PENDING|APPROVED|REJECTED`)
+
+Response `200` (`text/csv`) with `Content-Disposition: attachment; filename="vocabularies.csv"`
+
+### `GET /admin/vocab/{id}`
+Get vocabulary detail by id (including topic links).
+
+Response `200` (`VocabularyDetailResponse`)
+Note: `VocabularyDetailResponse` includes `definitionVi`, `examples: [string]`, and `topicIds: [uuid]`.
+
 ### `PATCH /admin/vocab/{id}`
 Update vocabulary fields.
 
@@ -363,14 +392,28 @@ Body (`UpdateVocabularyRequest`):
   "term": "apple",
   "definition": "A fruit...",
   "definitionVi": "Một loại trái cây...",
+  "examples": [
+    { "id": "f2a8c9f2-7b6e-4bc3-9a31-11b8c6cb9f12", "value": "I eat an apple every day." },
+    { "value": "Green apples are sour." }
+  ],
   "phonetic": "ˈæp.əl",
   "partOfSpeech": "noun",
   "language": "en",
-  "status": "APPROVED"
+  "status": "APPROVED",
+  "topicIds": [
+    "3f6d4c1c-1e5a-4b9d-8f77-3b9f1c7a2101",
+    "8d2b1f0a-6c9b-4d31-ae92-2f4f9e00b8ad"
+  ]
 }
 ```
 
 Response `200` (`VocabularyResponse`)
+Notes:
+- `examples` is optional. If provided, it replaces current examples:
+  - item with `id` => update existing example
+  - item without `id` => create new example
+  - existing examples not present in payload => removed
+- `topicIds` is optional. If provided, it replaces current topic links (add/remove as needed).
 
 ### `PATCH /admin/vocab/{id}/approve`
 Approve pending vocabulary.
@@ -381,6 +424,52 @@ Response `200` (`VocabularyResponse`)
 Reject pending vocabulary.
 
 Response `200` (`VocabularyResponse`)
+
+### `POST /admin/vocab/import`
+Bulk import vocabularies from CSV.
+
+Content-Type:
+- `multipart/form-data`
+
+Form-data:
+- `file` (required): CSV file
+
+CSV columns:
+- `term` (required)
+- `definition` (required)
+- `language` (required)
+- `definitionVi` (optional)
+- `examples` (optional, pipe `|` separated)
+- `phonetic` (optional)
+- `partOfSpeech` (optional)
+- `topics` (optional, topic names separated by `|`, alias: `topicNames`)
+- `status` (optional: `PENDING|APPROVED|REJECTED`, default `APPROVED`)
+
+Response `200` (`VocabularyImportResultResponse`)
+```json
+{
+  "totalRows": 2,
+  "importedRows": 1,
+  "failedRows": 1,
+  "errors": [
+    { "row": 2, "message": "Vocabulary already exists" }
+  ]
+}
+```
+
+CSV sample file:
+- `docs/samples/vocabulary-import-sample.csv`
+
+Topic mapping behavior:
+- If topic name already exists, system links vocab to that topic.
+- If topic name does not exist, system creates a new topic and links it automatically.
+
+Quick test:
+```bash
+curl -X POST "http://localhost:8080/admin/vocab/import" \
+  -H "Authorization: Bearer <token>" \
+  -F "file=@docs/samples/vocabulary-import-sample.csv"
+```
 
 ### `DELETE /admin/vocab/{id}`
 Soft delete vocabulary.

@@ -15,6 +15,8 @@ public interface TopicRepository extends JpaRepository<Topic, UUID> {
 
     Optional<Topic> findBySlugAndDeletedAtIsNull(String slug);
 
+    Optional<Topic> findByNameIgnoreCaseAndDeletedAtIsNull(String name);
+
     Page<Topic> findByStatusAndDeletedAtIsNull(TopicStatus status, Pageable pageable);
 
     boolean existsBySlug(String slug);
