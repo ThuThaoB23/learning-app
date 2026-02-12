@@ -4,7 +4,6 @@ import com.learnapp.dto.AddUserVocabularyRequest;
 import com.learnapp.dto.UpdateUserVocabularyRequest;
 import com.learnapp.dto.UserVocabularyResponse;
 import com.learnapp.entities.UserVocabStatus;
-import com.learnapp.entities.UserVocabulary;
 import com.learnapp.security.UserPrincipal;
 import com.learnapp.service.UserVocabularyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,7 +46,7 @@ public class UserVocabularyController {
             @RequestParam(required = false) UserVocabStatus status,
             @ParameterObject Pageable pageable
     ) {
-        return userVocabularyService.list(principal.id(), status, pageable).map(this::toResponse);
+        return userVocabularyService.listResponses(principal.id(), status, pageable);
     }
 
     /**
@@ -59,7 +58,7 @@ public class UserVocabularyController {
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody AddUserVocabularyRequest request
     ) {
-        return toResponse(userVocabularyService.add(principal.id(), request.vocabularyId()));
+        return userVocabularyService.toResponse(userVocabularyService.add(principal.id(), request.vocabularyId()));
     }
 
     /**
@@ -72,7 +71,7 @@ public class UserVocabularyController {
             @PathVariable UUID vocabularyId,
             @Valid @RequestBody UpdateUserVocabularyRequest request
     ) {
-        return toResponse(userVocabularyService.update(
+        return userVocabularyService.toResponse(userVocabularyService.update(
                 principal.id(),
                 vocabularyId,
                 request.status(),
@@ -91,16 +90,5 @@ public class UserVocabularyController {
             @PathVariable UUID vocabularyId
     ) {
         userVocabularyService.remove(principal.id(), vocabularyId);
-    }
-
-    private UserVocabularyResponse toResponse(UserVocabulary userVocabulary) {
-        return new UserVocabularyResponse(
-                userVocabulary.getVocabularyId(),
-                userVocabulary.getStatus(),
-                userVocabulary.getProgress(),
-                userVocabulary.getLastReviewedAt(),
-                userVocabulary.getCreatedAt(),
-                userVocabulary.getUpdatedAt()
-        );
     }
 }

@@ -6,6 +6,7 @@ import java.util.UUID;
 
 public record UserVocabularyResponse(
         UUID vocabularyId,
+        String term,
         UserVocabStatus status,
         Integer progress,
         LocalDateTime lastReviewedAt,

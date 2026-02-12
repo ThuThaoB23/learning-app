@@ -2,6 +2,8 @@ package com.learnapp.repository;
 
 import com.learnapp.entities.Vocabulary;
 import com.learnapp.entities.VocabularyStatus;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -16,6 +18,8 @@ public interface    VocabularyRepository extends JpaRepository<Vocabulary, UUID>
     Optional<Vocabulary> findByIdAndStatusAndDeletedAtIsNull(UUID id, VocabularyStatus status);
 
     Optional<Vocabulary> findByTermNormalizedAndLanguageAndDeletedAtIsNull(String termNormalized, String language);
+
+    List<Vocabulary> findByIdInAndStatusAndDeletedAtIsNull(Collection<UUID> ids, VocabularyStatus status);
 
     boolean existsByTermNormalizedAndLanguage(String termNormalized, String language);
 
@@ -52,6 +56,13 @@ public interface    VocabularyRepository extends JpaRepository<Vocabulary, UUID>
             Pageable pageable
     );
 
+    Page<Vocabulary> findByStatusAndDeletedAtIsNullAndLanguageAndIdNot(
+            VocabularyStatus status,
+            String language,
+            UUID id,
+            Pageable pageable
+    );
+
     @Query("""
             select v
             from Vocabulary v
@@ -63,6 +74,53 @@ public interface    VocabularyRepository extends JpaRepository<Vocabulary, UUID>
               and (:termNormalized is null or v.termNormalized like concat('%', :termNormalized, '%'))
             """)
     Page<Vocabulary> searchByTopic(
+            @Param("topicId") UUID topicId,
+            @Param("status") VocabularyStatus status,
+            @Param("language") String language,
+            @Param("termNormalized") String termNormalized,
+            Pageable pageable
+    );
+
+    @Query("""
+            select v
+            from Vocabulary v
+            where v.deletedAt is null
+              and (:status is null or v.status = :status)
+              and (:language is null or v.language = :language)
+              and (:termNormalized is null or v.termNormalized like concat('%', :termNormalized, '%'))
+              and not exists (
+                    select 1
+                    from UserVocabulary uv
+                    where uv.userId = :userId
+                      and uv.vocabularyId = v.id
+              )
+            """)
+    Page<Vocabulary> searchApprovedNotAddedByUser(
+            @Param("userId") UUID userId,
+            @Param("status") VocabularyStatus status,
+            @Param("language") String language,
+            @Param("termNormalized") String termNormalized,
+            Pageable pageable
+    );
+
+    @Query("""
+            select v
+            from Vocabulary v
+            join TopicVocabulary tv on tv.vocabularyId = v.id
+            where tv.topicId = :topicId
+              and v.deletedAt is null
+              and (:status is null or v.status = :status)
+              and (:language is null or v.language = :language)
+              and (:termNormalized is null or v.termNormalized like concat('%', :termNormalized, '%'))
+              and not exists (
+                    select 1
+                    from UserVocabulary uv
+                    where uv.userId = :userId
+                      and uv.vocabularyId = v.id
+              )
+            """)
+    Page<Vocabulary> searchByTopicNotAddedByUser(
+            @Param("userId") UUID userId,
             @Param("topicId") UUID topicId,
             @Param("status") VocabularyStatus status,
             @Param("language") String language,

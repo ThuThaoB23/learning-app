@@ -150,6 +150,39 @@ public class VocabularyService {
     }
 
     @Transactional(readOnly = true)
+    public Page<VocabularyResponse> searchApprovedNotAddedByUser(
+            UUID userId,
+            String query,
+            UUID topicId,
+            String language,
+            VocabularyStatus status,
+            Pageable pageable
+    ) {
+        String normalizedQuery = normalizeTerm(query);
+        String normalizedLanguage = normalizeLanguage(language);
+        VocabularyStatus effectiveStatus = status == null ? VocabularyStatus.APPROVED : status;
+
+        if (topicId != null) {
+            return toResponses(vocabularyRepository.searchByTopicNotAddedByUser(
+                    userId,
+                    topicId,
+                    effectiveStatus,
+                    normalizedLanguage,
+                    normalizedQuery,
+                    pageable
+            ));
+        }
+
+        return toResponses(vocabularyRepository.searchApprovedNotAddedByUser(
+                userId,
+                effectiveStatus,
+                normalizedLanguage,
+                normalizedQuery,
+                pageable
+        ));
+    }
+
+    @Transactional(readOnly = true)
     public List<VocabularyResponse> exportVocabularies(
             String query,
             UUID topicId,

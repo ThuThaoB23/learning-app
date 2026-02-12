@@ -1,0 +1,444 @@
+package com.learnapp.service;
+
+import com.learnapp.dto.SubmitTestItemAnswerResponse;
+import com.learnapp.dto.TestItemResponse;
+import com.learnapp.dto.TestSessionResponse;
+import com.learnapp.entities.TestItem;
+import com.learnapp.entities.TestItemStatus;
+import com.learnapp.entities.TestSession;
+import com.learnapp.entities.TestSessionSourceType;
+import com.learnapp.entities.TestSessionStatus;
+import com.learnapp.entities.TestSessionType;
+import com.learnapp.entities.User;
+import com.learnapp.entities.UserVocabStatus;
+import com.learnapp.entities.UserVocabulary;
+import com.learnapp.entities.Vocabulary;
+import com.learnapp.entities.VocabularyStatus;
+import com.learnapp.error.AppException;
+import com.learnapp.repository.TestItemRepository;
+import com.learnapp.repository.TestSessionRepository;
+import com.learnapp.repository.UserRepository;
+import com.learnapp.repository.UserVocabularyRepository;
+import com.learnapp.repository.VocabularyRepository;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@Transactional
+public class TestSessionService {
+
+    private static final int DAILY_SIZE = 20;
+    private static final int DAILY_DUE_QUOTA = 14;
+    private static final int DAILY_WEAK_QUOTA = 4;
+    private static final int DAILY_NEW_QUOTA = 2;
+    private static final int WEAK_THRESHOLD = 50;
+
+    private final TestSessionRepository testSessionRepository;
+    private final TestItemRepository testItemRepository;
+    private final UserVocabularyRepository userVocabularyRepository;
+    private final VocabularyRepository vocabularyRepository;
+    private final UserRepository userRepository;
+    private final SpacedRepetitionService spacedRepetitionService;
+    private final QuestionEngineService questionEngineService;
+
+    public TestSessionService(
+            TestSessionRepository testSessionRepository,
+            TestItemRepository testItemRepository,
+            UserVocabularyRepository userVocabularyRepository,
+            VocabularyRepository vocabularyRepository,
+            UserRepository userRepository,
+            SpacedRepetitionService spacedRepetitionService,
+            QuestionEngineService questionEngineService
+    ) {
+        this.testSessionRepository = testSessionRepository;
+        this.testItemRepository = testItemRepository;
+        this.userVocabularyRepository = userVocabularyRepository;
+        this.vocabularyRepository = vocabularyRepository;
+        this.userRepository = userRepository;
+        this.spacedRepetitionService = spacedRepetitionService;
+        this.questionEngineService = questionEngineService;
+    }
+
+    public TestSessionResponse createDailySession(UUID userId) {
+        User user = ensureUserNotDeleted(userId);
+        ZoneId zoneId = resolveZone(user.getTimeZone());
+        LocalDate today = LocalDate.now(zoneId);
+
+        TestSession existing = testSessionRepository.findByUserIdAndTypeAndScheduleDateAndStatus(
+                        userId,
+                        TestSessionType.DAILY,
+                        today,
+                        TestSessionStatus.ACTIVE
+                )
+                .orElse(null);
+        if (existing != null) {
+            return toResponse(existing, testItemRepository.findByTestSessionIdOrderByPositionAsc(existing.getId()));
+        }
+
+        List<UserVocabulary> allItems = userVocabularyRepository.findByUserId(userId);
+        if (allItems.isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "NO_USER_VOCAB", "No vocabulary found in user list");
+        }
+
+        List<UserVocabulary> selected = selectDailyItems(allItems, today, zoneId);
+        if (selected.isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "NO_ELIGIBLE_ITEMS", "No eligible items for daily session");
+        }
+
+        TestSession session = TestSession.builder()
+                .userId(userId)
+                .type(TestSessionType.DAILY)
+                .status(TestSessionStatus.ACTIVE)
+                .title("Daily Session " + today)
+                .scheduleDate(today)
+                .sourceType(TestSessionSourceType.DAILY_RULE)
+                .startedAt(LocalDateTime.now())
+                .build();
+        session = testSessionRepository.save(session);
+
+        List<TestItem> items = buildTestItems(selected, session, today, zoneId);
+        if (items.isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "NO_ELIGIBLE_VOCAB", "No approved vocabulary available");
+        }
+        items = testItemRepository.saveAll(items);
+        recalculateSessionStats(session, items);
+
+        return toResponse(session, items);
+    }
+
+    @Transactional(readOnly = true)
+    public TestSessionResponse getSession(UUID userId, UUID sessionId) {
+        TestSession session = findOwnedSession(userId, sessionId);
+        List<TestItem> items = testItemRepository.findByTestSessionIdOrderByPositionAsc(sessionId);
+        return toResponse(session, items);
+    }
+
+    public SubmitTestItemAnswerResponse submitAnswer(
+            UUID userId,
+            UUID sessionId,
+            UUID itemId,
+            String answer,
+            Integer timeMs
+    ) {
+        TestSession session = findOwnedSession(userId, sessionId);
+        if (session.getStatus() != TestSessionStatus.ACTIVE) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "SESSION_NOT_ACTIVE", "Session is not active");
+        }
+
+        TestItem item = testItemRepository.findByIdAndTestSessionId(itemId, sessionId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "TEST_ITEM_NOT_FOUND", "Test item not found"));
+        if (item.getStatus() != TestItemStatus.PENDING) {
+            return buildAlreadyAnsweredResponse(userId, item, answer);
+        }
+
+        UserVocabulary userVocabulary = userVocabularyRepository.findByIdAndUserId(item.getUserVocabId(), userId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "USER_VOCAB_NOT_FOUND", "User vocabulary not found"));
+
+        QuestionEngineService.GradeResult grade = questionEngineService.grade(item.getQuestionType(), item.getQuestionPayload(), answer);
+        LocalDateTime now = LocalDateTime.now();
+
+        item.setStatus(grade.correct() ? TestItemStatus.CORRECT : TestItemStatus.WRONG);
+        item.setUserAnswer(answer);
+        item.setAnsweredAt(now);
+        item.setTimeMs(timeMs);
+        testItemRepository.save(item);
+        recalculateSessionStats(session, testItemRepository.findByTestSessionIdOrderByPositionAsc(sessionId));
+
+        spacedRepetitionService.applyAttempt(userVocabulary, grade.correct(), now);
+        syncStatusByProcess(userVocabulary);
+        userVocabularyRepository.save(userVocabulary);
+
+        return new SubmitTestItemAnswerResponse(
+                item.getId(),
+                item.getStatus(),
+                grade.correct(),
+                grade.expected(),
+                grade.feedback(),
+                userVocabulary.getProcess(),
+                userVocabulary.getNextDueAt(),
+                userVocabulary.getStreak(),
+                userVocabulary.getRightCount(),
+                userVocabulary.getWrongCount()
+        );
+    }
+
+    public TestSessionResponse completeSession(UUID userId, UUID sessionId) {
+        TestSession session = findOwnedSession(userId, sessionId);
+        if (session.getStatus() == TestSessionStatus.COMPLETED) {
+            return toResponse(session, testItemRepository.findByTestSessionIdOrderByPositionAsc(session.getId()));
+        }
+        if (session.getStatus() == TestSessionStatus.ABANDONED) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "SESSION_NOT_ACTIVE", "Session was abandoned");
+        }
+        List<TestItem> items = testItemRepository.findByTestSessionIdOrderByPositionAsc(session.getId());
+        markPendingAsSkipped(items);
+        if (!items.isEmpty()) {
+            testItemRepository.saveAll(items);
+        }
+        session.setStatus(TestSessionStatus.COMPLETED);
+        session.setCompletedAt(LocalDateTime.now());
+        recalculateSessionStats(session, items);
+        return toResponse(session, items);
+    }
+
+    public TestSessionResponse abandonSession(UUID userId, UUID sessionId) {
+        TestSession session = findOwnedSession(userId, sessionId);
+        if (session.getStatus() == TestSessionStatus.ABANDONED) {
+            return toResponse(session, testItemRepository.findByTestSessionIdOrderByPositionAsc(session.getId()));
+        }
+        if (session.getStatus() == TestSessionStatus.COMPLETED) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "SESSION_NOT_ACTIVE", "Session was completed");
+        }
+        List<TestItem> items = testItemRepository.findByTestSessionIdOrderByPositionAsc(session.getId());
+        markPendingAsSkipped(items);
+        if (!items.isEmpty()) {
+            testItemRepository.saveAll(items);
+        }
+        session.setStatus(TestSessionStatus.ABANDONED);
+        session.setCompletedAt(LocalDateTime.now());
+        recalculateSessionStats(session, items);
+        return toResponse(session, items);
+    }
+
+    private List<UserVocabulary> selectDailyItems(List<UserVocabulary> allItems, LocalDate today, ZoneId zoneId) {
+        LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
+
+        List<UserVocabulary> dueItems = allItems.stream()
+                .filter(uv -> uv.getNextDueAt() != null && !uv.getNextDueAt().isAfter(endOfDay))
+                .sorted(byPriority(today, zoneId))
+                .toList();
+
+        List<UserVocabulary> weakItems = allItems.stream()
+                .filter(uv -> nullSafe(uv.getProcess()) <= WEAK_THRESHOLD)
+                .sorted(byPriority(today, zoneId))
+                .toList();
+
+        List<UserVocabulary> newItems = allItems.stream()
+                .filter(uv -> uv.getLastReviewedAt() == null || uv.getNextDueAt() == null)
+                .sorted(Comparator.comparing(UserVocabulary::getCreatedAt))
+                .toList();
+
+        List<UserVocabulary> picked = new ArrayList<>();
+        Set<UUID> pickedIds = new HashSet<>();
+
+        pick(dueItems, DAILY_DUE_QUOTA, pickedIds, picked);
+        pick(weakItems, DAILY_WEAK_QUOTA, pickedIds, picked);
+        pick(newItems, DAILY_NEW_QUOTA, pickedIds, picked);
+
+        if (picked.size() < DAILY_SIZE) {
+            List<UserVocabulary> fallback = new ArrayList<>(allItems);
+            fallback.sort(byPriority(today, zoneId));
+            pick(fallback, DAILY_SIZE - picked.size(), pickedIds, picked);
+        }
+
+        return picked.size() > DAILY_SIZE ? picked.subList(0, DAILY_SIZE) : picked;
+    }
+
+    private List<TestItem> buildTestItems(
+            List<UserVocabulary> selected,
+            TestSession session,
+            LocalDate today,
+            ZoneId zoneId
+    ) {
+        List<UUID> vocabIds = selected.stream().map(UserVocabulary::getVocabularyId).toList();
+        List<Vocabulary> vocabularies = vocabularyRepository.findByIdInAndStatusAndDeletedAtIsNull(vocabIds, VocabularyStatus.APPROVED);
+        Map<UUID, Vocabulary> vocabById = new HashMap<>();
+        for (Vocabulary vocabulary : vocabularies) {
+            vocabById.put(vocabulary.getId(), vocabulary);
+        }
+
+        List<TestItem> items = new ArrayList<>();
+        int position = 1;
+        for (UserVocabulary userVocabulary : selected) {
+            Vocabulary vocabulary = vocabById.get(userVocabulary.getVocabularyId());
+            if (vocabulary == null) {
+                continue;
+            }
+            List<Vocabulary> distractors = vocabularyRepository.findByStatusAndDeletedAtIsNullAndLanguageAndIdNot(
+                    VocabularyStatus.APPROVED,
+                    vocabulary.getLanguage(),
+                    vocabulary.getId(),
+                    PageRequest.of(0, 20)
+            ).getContent();
+
+            QuestionEngineService.GeneratedQuestion generated = questionEngineService.generateQuestion(
+                    userVocabulary,
+                    vocabulary,
+                    session.getType(),
+                    today,
+                    zoneId,
+                    distractors
+            );
+
+            items.add(TestItem.builder()
+                    .testSessionId(session.getId())
+                    .userVocabId(userVocabulary.getId())
+                    .questionType(generated.type())
+                    .questionPayload(generated.payload())
+                    .position(position++)
+                    .status(TestItemStatus.PENDING)
+                    .build());
+        }
+        return items;
+    }
+
+    private Comparator<UserVocabulary> byPriority(LocalDate today, ZoneId zoneId) {
+        return Comparator.comparingDouble((UserVocabulary uv) ->
+                spacedRepetitionService.priorityScore(uv, today, zoneId)).reversed();
+    }
+
+    private void pick(List<UserVocabulary> source, int need, Set<UUID> pickedIds, List<UserVocabulary> result) {
+        int added = 0;
+        for (UserVocabulary userVocabulary : source) {
+            if (added >= need) {
+                break;
+            }
+            if (pickedIds.add(userVocabulary.getId())) {
+                result.add(userVocabulary);
+                added++;
+            }
+        }
+    }
+
+    private TestSession findOwnedSession(UUID userId, UUID sessionId) {
+        ensureUserNotDeleted(userId);
+        return testSessionRepository.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", "Session not found"));
+    }
+
+    private SubmitTestItemAnswerResponse buildAlreadyAnsweredResponse(UUID userId, TestItem item, String answer) {
+        UserVocabulary userVocabulary = userVocabularyRepository.findByIdAndUserId(item.getUserVocabId(), userId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "USER_VOCAB_NOT_FOUND", "User vocabulary not found"));
+        boolean correct = item.getStatus() == TestItemStatus.CORRECT;
+        QuestionEngineService.GradeResult grade = questionEngineService.grade(item.getQuestionType(), item.getQuestionPayload(), answer);
+        return new SubmitTestItemAnswerResponse(
+                item.getId(),
+                item.getStatus(),
+                correct,
+                grade.expected(),
+                correct ? "Already answered correctly" : "Already answered incorrectly",
+                userVocabulary.getProcess(),
+                userVocabulary.getNextDueAt(),
+                userVocabulary.getStreak(),
+                userVocabulary.getRightCount(),
+                userVocabulary.getWrongCount()
+        );
+    }
+
+    private TestSessionResponse toResponse(TestSession session, List<TestItem> items) {
+        List<TestItemResponse> itemResponses = items.stream()
+                .sorted(Comparator.comparing(TestItem::getPosition))
+                .map(item -> new TestItemResponse(
+                        item.getId(),
+                        item.getQuestionType(),
+                        questionEngineService.toPlainJsonPayload(item.getQuestionPayload()),
+                        item.getPosition(),
+                        item.getStatus(),
+                        item.getUserAnswer(),
+                        item.getAnsweredAt(),
+                        item.getTimeMs()
+                ))
+                .toList();
+
+        return new TestSessionResponse(
+                session.getId(),
+                session.getType(),
+                session.getStatus(),
+                session.getTitle(),
+                session.getScheduleDate(),
+                session.getCreatedAt(),
+                session.getStartedAt(),
+                session.getCompletedAt(),
+                session.getTotalItems(),
+                session.getCorrectCount(),
+                session.getWrongCount(),
+                session.getSkippedCount(),
+                session.getScore(),
+                itemResponses
+        );
+    }
+
+    private void markPendingAsSkipped(List<TestItem> items) {
+        for (TestItem item : items) {
+            if (item.getStatus() == TestItemStatus.PENDING) {
+                item.setStatus(TestItemStatus.SKIPPED);
+            }
+        }
+    }
+
+    private void recalculateSessionStats(TestSession session, List<TestItem> items) {
+        int total = items.size();
+        int correct = 0;
+        int wrong = 0;
+        int skipped = 0;
+
+        for (TestItem item : items) {
+            if (item.getStatus() == TestItemStatus.CORRECT) {
+                correct++;
+            } else if (item.getStatus() == TestItemStatus.WRONG) {
+                wrong++;
+            } else if (item.getStatus() == TestItemStatus.SKIPPED) {
+                skipped++;
+            }
+        }
+
+        int score = total == 0 ? 0 : Math.round((correct * 100.0f) / total);
+        session.setTotalItems(total);
+        session.setCorrectCount(correct);
+        session.setWrongCount(wrong);
+        session.setSkippedCount(skipped);
+        session.setScore(score);
+        testSessionRepository.save(session);
+    }
+
+    private User ensureUserNotDeleted(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
+        if (user.getDeletedAt() != null) {
+            throw new AppException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
+        }
+        return user;
+    }
+
+    private ZoneId resolveZone(String timeZone) {
+        if (timeZone == null || timeZone.isBlank()) {
+            return ZoneId.systemDefault();
+        }
+        try {
+            return ZoneId.of(timeZone);
+        } catch (Exception ex) {
+            return ZoneId.systemDefault();
+        }
+    }
+
+    private int nullSafe(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private void syncStatusByProcess(UserVocabulary userVocabulary) {
+        int process = nullSafe(userVocabulary.getProcess());
+        if (process >= 90) {
+            userVocabulary.setStatus(UserVocabStatus.MASTERED);
+            return;
+        }
+        if (process >= 1) {
+            userVocabulary.setStatus(UserVocabStatus.LEARNING);
+            return;
+        }
+        userVocabulary.setStatus(UserVocabStatus.NEW);
+    }
+}

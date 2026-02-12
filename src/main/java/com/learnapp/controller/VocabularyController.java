@@ -38,13 +38,21 @@ public class VocabularyController {
     @Operation(summary = "Search vocab", description = "Search approved vocabularies by query, topic, or language.")
     @GetMapping
     public Page<VocabularyResponse> search(
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(required = false) String query,
             @RequestParam(required = false) UUID topicId,
             @RequestParam(required = false) String language,
             @RequestParam(required = false) VocabularyStatus status,
             @ParameterObject Pageable pageable
     ) {
-        return vocabularyService.searchApproved(query, topicId, language, status, pageable);
+        return vocabularyService.searchApprovedNotAddedByUser(
+                principal.id(),
+                query,
+                topicId,
+                language,
+                status,
+                pageable
+        );
     }
 
     /**

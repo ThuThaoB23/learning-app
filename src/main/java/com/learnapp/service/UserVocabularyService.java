@@ -1,5 +1,6 @@
 package com.learnapp.service;
 
+import com.learnapp.dto.UserVocabularyResponse;
 import com.learnapp.entities.User;
 import com.learnapp.entities.UserVocabStatus;
 import com.learnapp.entities.UserVocabulary;
@@ -10,6 +11,9 @@ import com.learnapp.repository.UserRepository;
 import com.learnapp.repository.UserVocabularyRepository;
 import com.learnapp.repository.VocabularyRepository;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,15 +28,18 @@ public class UserVocabularyService {
     private final UserVocabularyRepository userVocabularyRepository;
     private final VocabularyRepository vocabularyRepository;
     private final UserRepository userRepository;
+    private final SpacedRepetitionService spacedRepetitionService;
 
     public UserVocabularyService(
             UserVocabularyRepository userVocabularyRepository,
             VocabularyRepository vocabularyRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            SpacedRepetitionService spacedRepetitionService
     ) {
         this.userVocabularyRepository = userVocabularyRepository;
         this.vocabularyRepository = vocabularyRepository;
         this.userRepository = userRepository;
+        this.spacedRepetitionService = spacedRepetitionService;
     }
 
     @Transactional(readOnly = true)
@@ -42,6 +49,13 @@ public class UserVocabularyService {
             return userVocabularyRepository.findByUserId(userId, pageable);
         }
         return userVocabularyRepository.findByUserIdAndStatus(userId, status, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<UserVocabularyResponse> listResponses(UUID userId, UserVocabStatus status, Pageable pageable) {
+        Page<UserVocabulary> page = list(userId, status, pageable);
+        Map<UUID, String> termsByVocabId = loadTerms(page.stream().map(UserVocabulary::getVocabularyId).toList());
+        return page.map(userVocabulary -> toResponse(userVocabulary, termsByVocabId.get(userVocabulary.getVocabularyId())));
     }
 
     public UserVocabulary add(UUID userId, UUID vocabularyId) {
@@ -56,17 +70,25 @@ public class UserVocabularyService {
                 .userId(userId)
                 .vocabularyId(vocabulary.getId())
                 .status(UserVocabStatus.NEW)
-                .progress(0)
+                .process(0)
                 .build();
 
         return userVocabularyRepository.save(userVocabulary);
+    }
+
+    @Transactional(readOnly = true)
+    public UserVocabularyResponse toResponse(UserVocabulary userVocabulary) {
+        String term = vocabularyRepository.findByIdAndDeletedAtIsNull(userVocabulary.getVocabularyId())
+                .map(Vocabulary::getTerm)
+                .orElse(null);
+        return toResponse(userVocabulary, term);
     }
 
     public UserVocabulary update(
             UUID userId,
             UUID vocabularyId,
             UserVocabStatus status,
-            Integer progress,
+            Integer process,
             LocalDateTime lastReviewedAt
     ) {
         ensureUserNotDeleted(userId);
@@ -81,9 +103,12 @@ public class UserVocabularyService {
             userVocabulary.setStatus(status);
         }
 
-        if (progress != null) {
-            validateProgress(progress);
-            userVocabulary.setProgress(progress);
+        if (process != null) {
+            validateProcess(process);
+            userVocabulary.setProcess(process);
+            userVocabulary.setNextDueAt(lastReviewedAt == null
+                    ? null
+                    : lastReviewedAt.plusDays(spacedRepetitionService.intervalDays(process)));
         }
 
         if (lastReviewedAt != null) {
@@ -104,6 +129,19 @@ public class UserVocabularyService {
         userVocabularyRepository.delete(userVocabulary);
     }
 
+    public UserVocabulary recordAttempt(UUID userId, UUID vocabularyId, boolean isCorrect, LocalDateTime attemptedAt) {
+        ensureUserNotDeleted(userId);
+        UserVocabulary userVocabulary = userVocabularyRepository.findByUserIdAndVocabularyId(userId, vocabularyId)
+                .orElseThrow(() -> new AppException(
+                        HttpStatus.NOT_FOUND,
+                        "USER_VOCAB_NOT_FOUND",
+                        "User vocabulary not found"
+                ));
+        spacedRepetitionService.applyAttempt(userVocabulary, isCorrect, attemptedAt);
+        syncStatusByProcess(userVocabulary);
+        return userVocabularyRepository.save(userVocabulary);
+    }
+
     private Vocabulary getApprovedVocabulary(UUID vocabularyId) {
         return vocabularyRepository.findByIdAndStatusAndDeletedAtIsNull(vocabularyId, VocabularyStatus.APPROVED)
                 .orElseThrow(() -> new AppException(
@@ -121,9 +159,44 @@ public class UserVocabularyService {
         }
     }
 
-    private void validateProgress(int progress) {
-        if (progress < 0 || progress > 100) {
+    private void validateProcess(int process) {
+        if (process < 0 || process > 100) {
             throw new AppException(HttpStatus.BAD_REQUEST, "INVALID_PROGRESS", "Progress must be between 0 and 100");
         }
+    }
+
+    private void syncStatusByProcess(UserVocabulary userVocabulary) {
+        int process = userVocabulary.getProcess() == null ? 0 : userVocabulary.getProcess();
+        if (process >= 90) {
+            userVocabulary.setStatus(UserVocabStatus.MASTERED);
+            return;
+        }
+        if (process >= 1) {
+            userVocabulary.setStatus(UserVocabStatus.LEARNING);
+            return;
+        }
+        userVocabulary.setStatus(UserVocabStatus.NEW);
+    }
+
+    private Map<UUID, String> loadTerms(List<UUID> vocabularyIds) {
+        if (vocabularyIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> termsById = new HashMap<>();
+        vocabularyRepository.findAllById(vocabularyIds)
+                .forEach(vocabulary -> termsById.put(vocabulary.getId(), vocabulary.getTerm()));
+        return termsById;
+    }
+
+    private UserVocabularyResponse toResponse(UserVocabulary userVocabulary, String term) {
+        return new UserVocabularyResponse(
+                userVocabulary.getVocabularyId(),
+                term,
+                userVocabulary.getStatus(),
+                userVocabulary.getProcess(),
+                userVocabulary.getLastReviewedAt(),
+                userVocabulary.getCreatedAt(),
+                userVocabulary.getUpdatedAt()
+        );
     }
 }

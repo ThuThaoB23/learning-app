@@ -34,7 +34,9 @@ import org.hibernate.type.SqlTypes;
             @Index(name = "idx_user_vocab_user_id", columnList = "user_id"),
             @Index(name = "idx_user_vocab_vocab_id", columnList = "vocabulary_id"),
             @Index(name = "idx_user_vocab_status", columnList = "status"),
-            @Index(name = "idx_user_vocab_last_reviewed", columnList = "last_reviewed_at")
+            @Index(name = "idx_user_vocab_last_reviewed", columnList = "last_reviewed_at"),
+            @Index(name = "idx_user_vocab_next_due_at", columnList = "next_due_at"),
+            @Index(name = "idx_user_vocab_process", columnList = "process")
         }
 )
 @Getter
@@ -63,12 +65,27 @@ public class UserVocabulary {
     @Builder.Default
     private UserVocabStatus status = UserVocabStatus.NEW;
 
-    @Column(name = "progress", nullable = false)
+    @Column(name = "process", nullable = false)
     @Builder.Default
-    private Integer progress = 0;
+    private Integer process = 0;
 
     @Column(name = "last_reviewed_at")
     private LocalDateTime lastReviewedAt;
+
+    @Column(name = "next_due_at")
+    private LocalDateTime nextDueAt;
+
+    @Column(name = "streak", nullable = false)
+    @Builder.Default
+    private Integer streak = 0;
+
+    @Column(name = "right_count", nullable = false)
+    @Builder.Default
+    private Integer rightCount = 0;
+
+    @Column(name = "wrong_count", nullable = false)
+    @Builder.Default
+    private Integer wrongCount = 0;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

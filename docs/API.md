@@ -18,6 +18,139 @@ Pagination (Spring Pageable):
 - Query params: `page`, `size`, `sort`
 - Response: Spring `Page<T>` structure
 
+Response schema naming:
+- Trong từng endpoint, `Response 200 (XxxResponse)` nghĩa là body tuân theo schema chi tiết ở mục `Response Schemas` bên dưới.
+
+---
+
+## Response Schemas
+
+### `Page<T>`
+Spring Data trả về theo dạng:
+```json
+{
+  "content": [],
+  "pageable": { "...": "spring pageable metadata" },
+  "totalPages": 0,
+  "totalElements": 0,
+  "last": true,
+  "size": 20,
+  "number": 0,
+  "sort": { "...": "sort metadata" },
+  "numberOfElements": 0,
+  "first": true,
+  "empty": true
+}
+```
+Trong đó `content` là danh sách object `T`.
+
+### `UserResponse`
+- `id` (`uuid`)
+- `email` (`string`)
+- `username` (`string | null`)
+- `displayName` (`string`)
+- `avatarUrl` (`string | null`)
+- `role` (`USER | ADMIN`)
+- `status` (`ACTIVE | INACTIVE | BANNED | PENDING_VERIFICATION`)
+- `locale` (`string | null`)
+- `timeZone` (`string | null`)
+- `dailyGoal` (`number | null`)
+- `preferences` (`object | null`)
+- `lastLoginAt` (`datetime | null`)
+- `createdAt` (`datetime`)
+- `updatedAt` (`datetime`)
+
+### `LoginResponse`
+- `accessToken` (`string`)
+- `tokenType` (`string`, thường là `Bearer`)
+- `expiresInSeconds` (`number`)
+- `user` (`UserResponse`)
+
+### `TopicResponse`
+- `id` (`uuid`)
+- `name` (`string`)
+- `slug` (`string`)
+- `description` (`string | null`)
+- `createdAt` (`datetime`)
+
+### `VocabularyResponse`
+- `id` (`uuid`)
+- `term` (`string`)
+- `definition` (`string`)
+- `definitionVi` (`string | null`)
+- `examples` (`string[]`)
+- `phonetic` (`string | null`)
+- `partOfSpeech` (`string | null`)
+- `language` (`string`)
+- `status` (`PENDING | APPROVED | REJECTED`)
+- `createdBy` (`uuid | null`)
+- `createdAt` (`datetime`)
+
+### `VocabularyDetailResponse`
+- Toàn bộ field của `VocabularyResponse`
+- `topicIds` (`uuid[]`)
+
+### `UserVocabularyResponse`
+- `vocabularyId` (`uuid`)
+- `term` (`string | null`)
+- `status` (`NEW | LEARNING | MASTERED`)
+- `progress` (`number`, 0..100)
+- `lastReviewedAt` (`datetime | null`)
+- `createdAt` (`datetime`)
+- `updatedAt` (`datetime`)
+
+### `TestItemResponse`
+- `id` (`uuid`)
+- `questionType` (`MULTIPLE_CHOICE | TRUE_FALSE | FILL_MISSING_CHARS | TRANSLATE_TO_VI | TRANSLATE_TO_EN | ACTIVE_RECALL_FULL_WORD | CONTEXT_GAP`)
+- `questionPayload` (`object/json`)  
+  Ví dụ tùy loại câu hỏi:
+  - multiple choice: `{ "prompt": "...", "options": ["...", "...", "...", "..."] }`
+  - fill missing: `{ "prompt": "...", "maskedTerm": "a__le" }`
+  - translate/recall: `{ "prompt": "...", "hint": "a" }` (`hint` có thể không có)
+- `position` (`number`, bắt đầu từ 1)
+- `status` (`PENDING | CORRECT | WRONG | SKIPPED`)
+- `userAnswer` (`string | null`) - đáp án user đã gửi cho item đó
+- `answeredAt` (`datetime | null`)
+- `timeMs` (`number | null`)
+
+### `TestSessionResponse`
+- `id` (`uuid`)
+- `type` (`DAILY | REVIEW | NEW_WORDS | CUSTOM | SET_PRACTICE`)
+- `status` (`ACTIVE | COMPLETED | ABANDONED`)
+- `title` (`string | null`)
+- `scheduleDate` (`date | null`)
+- `createdAt` (`datetime`)
+- `startedAt` (`datetime | null`)
+- `completedAt` (`datetime | null`)
+- `totalItems` (`number`)
+- `correctCount` (`number`)
+- `wrongCount` (`number`)
+- `skippedCount` (`number`)
+- `score` (`number`, 0..100)
+- `items` (`TestItemResponse[]`)
+
+### `SubmitTestItemAnswerResponse`
+- `itemId` (`uuid`)
+- `status` (`CORRECT | WRONG | PENDING | SKIPPED`)
+- `correct` (`boolean`)
+- `expected` (`string`)
+- `feedback` (`string`)
+- `process` (`number`, 0..100)
+- `nextDueAt` (`datetime | null`)
+- `streak` (`number`)
+- `rightCount` (`number`)
+- `wrongCount` (`number`)
+
+### `VocabularyImportResultResponse`
+- `totalRows` (`number`)
+- `importedRows` (`number`)
+- `failedRows` (`number`)
+- `errors` (`VocabularyImportErrorResponse[]`)
+
+### `VocabularyImportErrorResponse`
+- `row` (`number`)
+- `message` (`string`)
+
 ---
 
 ## Auth
@@ -270,7 +403,7 @@ Response `204 No Content`
 ## Vocabulary
 
 ### `GET /vocab` (Auth)
-Search approved vocabularies.
+Search approved vocabularies that are not yet added to current user's learning list.
 
 Query:
 - `query` (optional)
@@ -319,6 +452,7 @@ Query:
 - `page`, `size`, `sort`
 
 Response `200` (`Page<UserVocabularyResponse>`)
+Note: `UserVocabularyResponse` now includes `term`.
 
 ### `POST /me/vocab` (Auth)
 Add vocab to personal list.
@@ -349,6 +483,43 @@ Response `200` (`UserVocabularyResponse`)
 Remove vocab from list.
 
 Response `204 No Content`
+
+---
+
+## User Test Sessions
+
+### `POST /me/sessions/daily` (Auth)
+Create daily session (or return active daily session for today).
+
+Response `200` (`TestSessionResponse`)
+
+### `GET /me/sessions/{sessionId}` (Auth)
+Get test session detail with ordered items.
+
+Response `200` (`TestSessionResponse`)
+
+### `POST /me/sessions/{sessionId}/items/{itemId}/answer` (Auth)
+Submit answer for one test item.
+
+Body (`SubmitTestItemAnswerRequest`):
+```json
+{
+  "answer": "apple",
+  "timeMs": 3200
+}
+```
+
+Response `200` (`SubmitTestItemAnswerResponse`)
+
+### `POST /me/sessions/{sessionId}/complete` (Auth)
+Mark active session as completed.
+
+Response `200` (`TestSessionResponse`)
+
+### `POST /me/sessions/{sessionId}/abandon` (Auth)
+Mark active session as abandoned.
+
+Response `200` (`TestSessionResponse`)
 
 ---
 
