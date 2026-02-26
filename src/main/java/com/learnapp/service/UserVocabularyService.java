@@ -29,17 +29,20 @@ public class UserVocabularyService {
     private final VocabularyRepository vocabularyRepository;
     private final UserRepository userRepository;
     private final SpacedRepetitionService spacedRepetitionService;
+    private final UserActivityLogService userActivityLogService;
 
     public UserVocabularyService(
             UserVocabularyRepository userVocabularyRepository,
             VocabularyRepository vocabularyRepository,
             UserRepository userRepository,
-            SpacedRepetitionService spacedRepetitionService
+            SpacedRepetitionService spacedRepetitionService,
+            UserActivityLogService userActivityLogService
     ) {
         this.userVocabularyRepository = userVocabularyRepository;
         this.vocabularyRepository = vocabularyRepository;
         this.userRepository = userRepository;
         this.spacedRepetitionService = spacedRepetitionService;
+        this.userActivityLogService = userActivityLogService;
     }
 
     @Transactional(readOnly = true)
@@ -73,7 +76,9 @@ public class UserVocabularyService {
                 .process(0)
                 .build();
 
-        return userVocabularyRepository.save(userVocabulary);
+        UserVocabulary savedUserVocabulary = userVocabularyRepository.save(userVocabulary);
+        userActivityLogService.logAddMyVocab(userId, vocabulary, savedUserVocabulary);
+        return savedUserVocabulary;
     }
 
     @Transactional(readOnly = true)

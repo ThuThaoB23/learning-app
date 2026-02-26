@@ -83,12 +83,56 @@ Trong đó `content` là danh sách object `T`.
 - `partOfSpeech` (`string | null`)
 - `language` (`string`)
 - `status` (`PENDING | APPROVED | REJECTED`)
+- `inMyVocab` (`boolean | null`) - trạng thái từ này có nằm trong My Vocab của user hiện tại hay không; `null` nếu endpoint không tính field này
 - `createdBy` (`uuid | null`)
 - `createdAt` (`datetime`)
 
 ### `VocabularyDetailResponse`
 - Toàn bộ field của `VocabularyResponse`
 - `topicIds` (`uuid[]`)
+
+### `VocabularyContributionResponse`
+- `id` (`uuid`)
+- `contributorUserId` (`uuid`)
+- `contributorDisplayName` (`string | null`)
+- `term` (`string`)
+- `definition` (`string`)
+- `definitionVi` (`string | null`)
+- `examples` (`string[]`)
+- `phonetic` (`string | null`)
+- `partOfSpeech` (`string | null`)
+- `language` (`string`)
+- `topicIds` (`uuid[]`)
+- `status` (`SUBMITTED | IN_REVIEW | APPROVED | REJECTED | CANCELED`)
+- `reviewNote` (`string | null`)
+- `rejectReason` (`DUPLICATE | INVALID_DEFINITION | WRONG_LANGUAGE | LOW_QUALITY | INAPPROPRIATE_CONTENT | OTHER | null`)
+- `approvedVocabularyId` (`uuid | null`)
+- `reviewedBy` (`uuid | null`)
+- `reviewedAt` (`datetime | null`)
+- `createdAt` (`datetime`)
+- `updatedAt` (`datetime`)
+
+### `AdminVocabularyContributionQueueItemResponse`
+- `id` (`uuid`)
+- `term` (`string`)
+- `language` (`string`)
+- `partOfSpeech` (`string | null`)
+- `contributorUserId` (`uuid`)
+- `contributorDisplayName` (`string | null`)
+- `status` (`SUBMITTED | IN_REVIEW | APPROVED | REJECTED | CANCELED`)
+- `createdAt` (`datetime`)
+
+### `VocabularyContributionReviewLogResponse`
+- `id` (`uuid`)
+- `action` (`SUBMIT | START_REVIEW | APPROVE | REJECT | REOPEN`)
+- `actorUserId` (`uuid`)
+- `actorDisplayName` (`string | null`)
+- `note` (`string | null`)
+- `createdAt` (`datetime`)
+
+### `AdminVocabularyContributionDetailResponse`
+- `contribution` (`VocabularyContributionResponse`)
+- `reviewLogs` (`VocabularyContributionReviewLogResponse[]`)
 
 ### `UserVocabularyResponse`
 - `vocabularyId` (`uuid`)
@@ -98,6 +142,16 @@ Trong đó `content` là danh sách object `T`.
 - `lastReviewedAt` (`datetime | null`)
 - `createdAt` (`datetime`)
 - `updatedAt` (`datetime`)
+
+### `UserActivityLogResponse`
+- `id` (`uuid`)
+- `userId` (`uuid`)
+- `userDisplayName` (`string | null`)
+- `activityType` (`REGISTER_ACCOUNT | COMPLETE_STUDY_SESSION | ADD_MYVOCAB | SUBMIT_VOCAB_CONTRIBUTION | APPROVE_VOCAB_CONTRIBUTION | REJECT_VOCAB_CONTRIBUTION`)
+- `targetType` (`ACCOUNT | TEST_SESSION | VOCABULARY | VOCABULARY_CONTRIBUTION | null`)
+- `targetId` (`uuid | null`)
+- `metadata` (`object/json | null`)
+- `createdAt` (`datetime`)
 
 ### `TestItemResponse`
 - `id` (`uuid`)
@@ -109,6 +163,7 @@ Trong đó `content` là danh sách object `T`.
   - translate/recall: `{ "prompt": "...", "hint": "a" }` (`hint` có thể không có)
 - `position` (`number`, bắt đầu từ 1)
 - `status` (`PENDING | CORRECT | WRONG | SKIPPED`)
+- `expected` (`string | null`) - đáp án đúng để review; `null` khi item còn `PENDING` trong session `ACTIVE` (tránh lộ đáp án)
 - `userAnswer` (`string | null`) - đáp án user đã gửi cho item đó
 - `answeredAt` (`datetime | null`)
 - `timeMs` (`number | null`)
@@ -234,6 +289,18 @@ Body (`UpdateMeRequest`):
 
 Response `200` (`UserResponse`)
 
+### `GET /me/activity-logs` (Auth)
+Get current user's activity history.
+
+Query:
+- `activityType` (optional: `REGISTER_ACCOUNT|COMPLETE_STUDY_SESSION|ADD_MYVOCAB|SUBMIT_VOCAB_CONTRIBUTION|APPROVE_VOCAB_CONTRIBUTION|REJECT_VOCAB_CONTRIBUTION`)
+- `targetType` (optional: `ACCOUNT|TEST_SESSION|VOCABULARY|VOCABULARY_CONTRIBUTION`)
+- `from` (optional, ISO datetime, ví dụ `2026-02-26T00:00:00`)
+- `to` (optional, ISO datetime)
+- `page`, `size`, `sort` (mặc định nên dùng `sort=createdAt,desc`)
+
+Response `200` (`Page<UserActivityLogResponse>`)
+
 ---
 
 ## Admin Users (Admin)
@@ -307,10 +374,39 @@ Body (`AdminResetPasswordRequest`):
 
 Response `204 No Content`
 
+### `GET /admin/users/{userId}/activity-logs`
+List activity logs of a specific user (admin view).
+
+Query:
+- `activityType` (optional: `REGISTER_ACCOUNT|COMPLETE_STUDY_SESSION|ADD_MYVOCAB|SUBMIT_VOCAB_CONTRIBUTION|APPROVE_VOCAB_CONTRIBUTION|REJECT_VOCAB_CONTRIBUTION`)
+- `targetType` (optional: `ACCOUNT|TEST_SESSION|VOCABULARY|VOCABULARY_CONTRIBUTION`)
+- `from` (optional, ISO datetime)
+- `to` (optional, ISO datetime)
+- `page`, `size`, `sort`
+
+Response `200` (`Page<UserActivityLogResponse>`)
+
 ### `POST /admin/users/{userId}/restore`
 Restore soft-deleted user.
 
 Response `200` (`UserResponse`)
+
+---
+
+## Admin Activity Logs (Admin)
+
+### `GET /admin/activity-logs`
+List activity logs across all users.
+
+Query:
+- `userId` (optional, filter 1 user cụ thể)
+- `activityType` (optional: `REGISTER_ACCOUNT|COMPLETE_STUDY_SESSION|ADD_MYVOCAB|SUBMIT_VOCAB_CONTRIBUTION|APPROVE_VOCAB_CONTRIBUTION|REJECT_VOCAB_CONTRIBUTION`)
+- `targetType` (optional: `ACCOUNT|TEST_SESSION|VOCABULARY|VOCABULARY_CONTRIBUTION`)
+- `from` (optional, ISO datetime)
+- `to` (optional, ISO datetime)
+- `page`, `size`, `sort`
+
+Response `200` (`Page<UserActivityLogResponse>`)
 
 ---
 
@@ -403,17 +499,21 @@ Response `204 No Content`
 ## Vocabulary
 
 ### `GET /vocab` (Auth)
-Search approved vocabularies that are not yet added to current user's learning list.
+Search approved vocabularies for màn thêm mới từ vựng.
 
 Query:
 - `query` (optional)
 - `topicId` (optional)
 - `language` (optional)
 - `status` (optional: `PENDING|APPROVED|REJECTED`)
+- `includeMyVocab` (optional, `boolean`, default `false`) - `true` để vẫn trả về các từ đã có trong My Vocab
 - `page`, `size`, `sort`
 
 Response `200` (`Page<VocabularyResponse>`)
-Note: `VocabularyResponse` includes `definitionVi` and `examples: [string]`.
+Notes:
+- Mặc định (`includeMyVocab=false`): vẫn loại các từ đã có trong My Vocab khỏi kết quả.
+- Khi `includeMyVocab=true`: kết quả có thể chứa cả từ đã có trong My Vocab, và dùng `inMyVocab` để phân biệt.
+- `VocabularyResponse` includes `definitionVi` and `examples: [string]`.
 
 ### `GET /vocab/{id}` (Auth)
 Get approved vocabulary by id.
@@ -422,7 +522,7 @@ Response `200` (`VocabularyResponse`)
 Note: `VocabularyResponse` includes `definitionVi` and `examples: [string]`.
 
 ### `POST /vocab/contributions` (Auth)
-Submit a new vocabulary contribution (PENDING).
+Submit a new vocabulary contribution (goes to admin review queue).
 
 Body (`CreateVocabularyRequest`):
 ```json
@@ -438,7 +538,7 @@ Body (`CreateVocabularyRequest`):
 }
 ```
 
-Response `200` (`VocabularyResponse`)
+Response `200` (`VocabularyContributionResponse`)
 
 ---
 
@@ -453,6 +553,15 @@ Query:
 
 Response `200` (`Page<UserVocabularyResponse>`)
 Note: `UserVocabularyResponse` now includes `term`.
+
+### `GET /me/vocab/contributions` (Auth)
+List vocabulary contributions submitted by current user.
+
+Query:
+- `status` (optional: `SUBMITTED|IN_REVIEW|APPROVED|REJECTED|CANCELED`)
+- `page`, `size`, `sort`
+
+Response `200` (`Page<VocabularyContributionResponse>`)
 
 ### `POST /me/vocab` (Auth)
 Add vocab to personal list.
@@ -492,11 +601,13 @@ Response `204 No Content`
 Create daily session (or return active daily session for today).
 
 Response `200` (`TestSessionResponse`)
+Note: Response có `items[]`. Mỗi item có field `expected`, nhưng item `PENDING` trong session `ACTIVE` sẽ trả `expected = null`.
 
 ### `GET /me/sessions/{sessionId}` (Auth)
 Get test session detail with ordered items.
 
 Response `200` (`TestSessionResponse`)
+Note: `items[].expected` được trả cho item đã có kết quả (`CORRECT|WRONG|SKIPPED`) hoặc khi session không còn `ACTIVE` (phục vụ review).
 
 ### `POST /me/sessions/{sessionId}/items/{itemId}/answer` (Auth)
 Submit answer for one test item.
@@ -646,3 +757,48 @@ curl -X POST "http://localhost:8080/admin/vocab/import" \
 Soft delete vocabulary.
 
 Response `204 No Content`
+
+---
+
+## Admin Vocabulary Contributions (Admin)
+
+### `GET /admin/vocab-contributions`
+List user vocabulary contributions for admin review queue.
+
+Query:
+- `query` (optional: search by term/definition)
+- `language` (optional)
+- `status` (optional: `SUBMITTED|IN_REVIEW|APPROVED|REJECTED|CANCELED`)
+- `page`, `size`, `sort`
+
+Response `200` (`Page<AdminVocabularyContributionQueueItemResponse>`)
+
+### `GET /admin/vocab-contributions/{id}`
+Get contribution detail with examples, topicIds, and review logs.
+
+Response `200` (`AdminVocabularyContributionDetailResponse`)
+
+### `PATCH /admin/vocab-contributions/{id}/approve`
+Approve contribution and create an approved vocabulary entry.
+
+Body (`ApproveVocabularyContributionRequest`) (optional):
+```json
+{
+  "reviewNote": "Looks good"
+}
+```
+
+Response `200` (`VocabularyContributionResponse`)
+
+### `PATCH /admin/vocab-contributions/{id}/reject`
+Reject contribution with reason.
+
+Body (`RejectVocabularyContributionRequest`):
+```json
+{
+  "rejectReason": "DUPLICATE",
+  "reviewNote": "Already exists in system"
+}
+```
+
+Response `200` (`VocabularyContributionResponse`)

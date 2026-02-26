@@ -2,8 +2,10 @@ package com.learnapp.controller;
 
 import com.learnapp.dto.CreateVocabularyRequest;
 import com.learnapp.dto.VocabularyResponse;
+import com.learnapp.dto.VocabularyContributionResponse;
 import com.learnapp.entities.VocabularyStatus;
 import com.learnapp.security.UserPrincipal;
+import com.learnapp.service.VocabularyContributionService;
 import com.learnapp.service.VocabularyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,9 +29,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class VocabularyController {
 
     private final VocabularyService vocabularyService;
+    private final VocabularyContributionService vocabularyContributionService;
 
-    public VocabularyController(VocabularyService vocabularyService) {
+    public VocabularyController(
+            VocabularyService vocabularyService,
+            VocabularyContributionService vocabularyContributionService
+    ) {
         this.vocabularyService = vocabularyService;
+        this.vocabularyContributionService = vocabularyContributionService;
     }
 
     /**
@@ -43,14 +50,16 @@ public class VocabularyController {
             @RequestParam(required = false) UUID topicId,
             @RequestParam(required = false) String language,
             @RequestParam(required = false) VocabularyStatus status,
+            @RequestParam(defaultValue = "false") boolean includeMyVocab,
             @ParameterObject Pageable pageable
     ) {
-        return vocabularyService.searchApprovedNotAddedByUser(
+        return vocabularyService.searchForUser(
                 principal.id(),
                 query,
                 topicId,
                 language,
                 status,
+                includeMyVocab,
                 pageable
         );
     }
@@ -69,20 +78,10 @@ public class VocabularyController {
      */
     @Operation(summary = "Contribute vocab", description = "Submit a new vocabulary entry for review.")
     @PostMapping("/contributions")
-    public VocabularyResponse contribute(
+    public VocabularyContributionResponse contribute(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody CreateVocabularyRequest request
     ) {
-        return vocabularyService.createContribution(
-                principal.id(),
-                request.term(),
-                request.definition(),
-                request.definitionVi(),
-                request.examples(),
-                request.phonetic(),
-                request.partOfSpeech(),
-                request.language(),
-                request.topicIds()
-        );
+        return vocabularyContributionService.submit(principal.id(), request);
     }
 }

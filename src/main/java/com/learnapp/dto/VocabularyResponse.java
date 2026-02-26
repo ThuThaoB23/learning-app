@@ -15,6 +15,7 @@ public record VocabularyResponse(
         String partOfSpeech,
         String language,
         VocabularyStatus status,
+        Boolean inMyVocab,
         UUID createdBy,
         LocalDateTime createdAt
 ) {}

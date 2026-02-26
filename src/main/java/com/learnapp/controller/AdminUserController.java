@@ -3,20 +3,26 @@ package com.learnapp.controller;
 import com.learnapp.dto.AdminUpdateUserRequest;
 import com.learnapp.dto.AdminResetPasswordRequest;
 import com.learnapp.dto.RegisterRequest;
+import com.learnapp.dto.UserActivityLogResponse;
 import com.learnapp.dto.UserResponse;
+import com.learnapp.entities.UserActivityTargetType;
+import com.learnapp.entities.UserActivityType;
 import com.learnapp.entities.UserRole;
 import com.learnapp.entities.UserStatus;
 import com.learnapp.service.AuthService;
+import com.learnapp.service.UserActivityLogService;
 import com.learnapp.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,10 +42,16 @@ public class AdminUserController {
 
     private final AuthService authService;
     private final UserService userService;
+    private final UserActivityLogService userActivityLogService;
 
-    public AdminUserController(AuthService authService, UserService userService) {
+    public AdminUserController(
+            AuthService authService,
+            UserService userService,
+            UserActivityLogService userActivityLogService
+    ) {
         this.authService = authService;
         this.userService = userService;
+        this.userActivityLogService = userActivityLogService;
     }
 
     /**
@@ -116,6 +128,21 @@ public class AdminUserController {
     ) {
         userService.resetPassword(userId, request);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "List user activity logs", description = "List activity logs for a specific user with optional filters.")
+    @org.springframework.web.bind.annotation.GetMapping("/{userId}/activity-logs")
+    public Page<UserActivityLogResponse> listUserActivityLogs(
+            @PathVariable UUID userId,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) UserActivityType activityType,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) UserActivityTargetType targetType,
+            @org.springframework.web.bind.annotation.RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @org.springframework.web.bind.annotation.RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+            @ParameterObject Pageable pageable
+    ) {
+        return userActivityLogService.listUserActivitiesForAdmin(userId, activityType, targetType, from, to, pageable);
     }
 
     /**

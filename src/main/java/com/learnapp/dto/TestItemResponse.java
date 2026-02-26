@@ -11,6 +11,7 @@ public record TestItemResponse(
         Object questionPayload,
         Integer position,
         TestItemStatus status,
+        String expected,
         String userAnswer,
         LocalDateTime answeredAt,
         Integer timeMs

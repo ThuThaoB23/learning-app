@@ -9,12 +9,14 @@ import com.learnapp.dto.VocabularyResponse;
 import com.learnapp.entities.Topic;
 import com.learnapp.entities.TopicStatus;
 import com.learnapp.entities.TopicVocabulary;
+import com.learnapp.entities.UserVocabulary;
 import com.learnapp.entities.Vocabulary;
 import com.learnapp.entities.VocabularyExample;
 import com.learnapp.entities.VocabularyStatus;
 import com.learnapp.error.AppException;
 import com.learnapp.repository.TopicRepository;
 import com.learnapp.repository.TopicVocabularyRepository;
+import com.learnapp.repository.UserVocabularyRepository;
 import com.learnapp.repository.VocabularyExampleRepository;
 import com.learnapp.repository.VocabularyRepository;
 import java.io.IOException;
@@ -52,17 +54,20 @@ public class VocabularyService {
     private final VocabularyRepository vocabularyRepository;
     private final TopicRepository topicRepository;
     private final TopicVocabularyRepository topicVocabularyRepository;
+    private final UserVocabularyRepository userVocabularyRepository;
     private final VocabularyExampleRepository vocabularyExampleRepository;
 
     public VocabularyService(
             VocabularyRepository vocabularyRepository,
             TopicRepository topicRepository,
             TopicVocabularyRepository topicVocabularyRepository,
+            UserVocabularyRepository userVocabularyRepository,
             VocabularyExampleRepository vocabularyExampleRepository
     ) {
         this.vocabularyRepository = vocabularyRepository;
         this.topicRepository = topicRepository;
         this.topicVocabularyRepository = topicVocabularyRepository;
+        this.userVocabularyRepository = userVocabularyRepository;
         this.vocabularyExampleRepository = vocabularyExampleRepository;
     }
 
@@ -74,79 +79,7 @@ public class VocabularyService {
             VocabularyStatus status,
             Pageable pageable
     ) {
-        String normalizedQuery = normalizeTerm(query);
-        String normalizedLanguage = normalizeLanguage(language);
-
-        if (topicId != null) {
-            Page<Vocabulary> page = vocabularyRepository.searchByTopic(
-                    topicId,
-                    status,
-                    normalizedLanguage,
-                    normalizedQuery,
-                    pageable
-            );
-            return toResponses(page);
-        }
-
-        if (status != null && normalizedQuery != null && normalizedLanguage != null) {
-            Page<Vocabulary> page = vocabularyRepository.findByStatusAndDeletedAtIsNullAndLanguageAndTermNormalizedContainingIgnoreCase(
-                    status,
-                    normalizedLanguage,
-                    normalizedQuery,
-                    pageable
-            );
-            return toResponses(page);
-        }
-
-        if (status != null && normalizedQuery != null) {
-            Page<Vocabulary> page = vocabularyRepository.findByStatusAndDeletedAtIsNullAndTermNormalizedContainingIgnoreCase(
-                    status,
-                    normalizedQuery,
-                    pageable
-            );
-            return toResponses(page);
-        }
-
-        if (status != null && normalizedLanguage != null) {
-            Page<Vocabulary> page = vocabularyRepository.findByStatusAndDeletedAtIsNullAndLanguage(
-                    status,
-                    normalizedLanguage,
-                    pageable
-            );
-            return toResponses(page);
-        }
-
-        if (status != null) {
-            Page<Vocabulary> page = vocabularyRepository.findByStatusAndDeletedAtIsNull(status, pageable);
-            return toResponses(page);
-        }
-
-        if (normalizedQuery != null && normalizedLanguage != null) {
-            Page<Vocabulary> page = vocabularyRepository.findByDeletedAtIsNullAndLanguageAndTermNormalizedContainingIgnoreCase(
-                    normalizedLanguage,
-                    normalizedQuery,
-                    pageable
-            );
-            return toResponses(page);
-        }
-
-        if (normalizedQuery != null) {
-            Page<Vocabulary> page = vocabularyRepository.findByDeletedAtIsNullAndTermNormalizedContainingIgnoreCase(
-                    normalizedQuery,
-                    pageable
-            );
-            return toResponses(page);
-        }
-
-        if (normalizedLanguage != null) {
-            Page<Vocabulary> page = vocabularyRepository.findByDeletedAtIsNullAndLanguage(
-                    normalizedLanguage,
-                    pageable
-            );
-            return toResponses(page);
-        }
-
-        return toResponses(vocabularyRepository.findByDeletedAtIsNull(pageable));
+        return toResponses(searchApprovedPage(query, topicId, language, status, pageable));
     }
 
     @Transactional(readOnly = true)
@@ -180,6 +113,98 @@ public class VocabularyService {
                 normalizedQuery,
                 pageable
         ));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<VocabularyResponse> searchForUser(
+            UUID userId,
+            String query,
+            UUID topicId,
+            String language,
+            VocabularyStatus status,
+            boolean includeMyVocab,
+            Pageable pageable
+    ) {
+        VocabularyStatus effectiveStatus = status == null ? VocabularyStatus.APPROVED : status;
+        if (includeMyVocab) {
+            return toResponses(searchApprovedPage(query, topicId, language, effectiveStatus, pageable), userId);
+        }
+        return searchApprovedNotAddedByUser(userId, query, topicId, language, effectiveStatus, pageable)
+                .map(vocab -> withInMyVocab(vocab, false));
+    }
+
+    private Page<Vocabulary> searchApprovedPage(
+            String query,
+            UUID topicId,
+            String language,
+            VocabularyStatus status,
+            Pageable pageable
+    ) {
+        String normalizedQuery = normalizeTerm(query);
+        String normalizedLanguage = normalizeLanguage(language);
+
+        if (topicId != null) {
+            return vocabularyRepository.searchByTopic(
+                    topicId,
+                    status,
+                    normalizedLanguage,
+                    normalizedQuery,
+                    pageable
+            );
+        }
+
+        if (status != null && normalizedQuery != null && normalizedLanguage != null) {
+            return vocabularyRepository.findByStatusAndDeletedAtIsNullAndLanguageAndTermNormalizedContainingIgnoreCase(
+                    status,
+                    normalizedLanguage,
+                    normalizedQuery,
+                    pageable
+            );
+        }
+
+        if (status != null && normalizedQuery != null) {
+            return vocabularyRepository.findByStatusAndDeletedAtIsNullAndTermNormalizedContainingIgnoreCase(
+                    status,
+                    normalizedQuery,
+                    pageable
+            );
+        }
+
+        if (status != null && normalizedLanguage != null) {
+            return vocabularyRepository.findByStatusAndDeletedAtIsNullAndLanguage(
+                    status,
+                    normalizedLanguage,
+                    pageable
+            );
+        }
+
+        if (status != null) {
+            return vocabularyRepository.findByStatusAndDeletedAtIsNull(status, pageable);
+        }
+
+        if (normalizedQuery != null && normalizedLanguage != null) {
+            return vocabularyRepository.findByDeletedAtIsNullAndLanguageAndTermNormalizedContainingIgnoreCase(
+                    normalizedLanguage,
+                    normalizedQuery,
+                    pageable
+            );
+        }
+
+        if (normalizedQuery != null) {
+            return vocabularyRepository.findByDeletedAtIsNullAndTermNormalizedContainingIgnoreCase(
+                    normalizedQuery,
+                    pageable
+            );
+        }
+
+        if (normalizedLanguage != null) {
+            return vocabularyRepository.findByDeletedAtIsNullAndLanguage(
+                    normalizedLanguage,
+                    pageable
+            );
+        }
+
+        return vocabularyRepository.findByDeletedAtIsNull(pageable);
     }
 
     @Transactional(readOnly = true)
@@ -720,12 +745,25 @@ public class VocabularyService {
     }
 
     private Page<VocabularyResponse> toResponses(Page<Vocabulary> page) {
+        return toResponses(page, null);
+    }
+
+    private Page<VocabularyResponse> toResponses(Page<Vocabulary> page, UUID userId) {
         List<UUID> ids = page.stream().map(Vocabulary::getId).toList();
         Map<UUID, List<String>> examplesByVocab = loadExamples(ids);
-        return page.map(vocab -> toResponse(vocab, examplesByVocab.getOrDefault(vocab.getId(), List.of())));
+        Set<UUID> myVocabIds = loadUserVocabularyIds(userId, ids);
+        return page.map(vocab -> toResponse(
+                vocab,
+                examplesByVocab.getOrDefault(vocab.getId(), List.of()),
+                userId == null ? null : myVocabIds.contains(vocab.getId())
+        ));
     }
 
     private VocabularyResponse toResponse(Vocabulary vocabulary, List<String> examples) {
+        return toResponse(vocabulary, examples, null);
+    }
+
+    private VocabularyResponse toResponse(Vocabulary vocabulary, List<String> examples, Boolean inMyVocab) {
         return new VocabularyResponse(
                 vocabulary.getId(),
                 vocabulary.getTerm(),
@@ -736,8 +774,26 @@ public class VocabularyService {
                 vocabulary.getPartOfSpeech(),
                 vocabulary.getLanguage(),
                 vocabulary.getStatus(),
+                inMyVocab,
                 vocabulary.getCreatedBy(),
                 vocabulary.getCreatedAt()
+        );
+    }
+
+    private VocabularyResponse withInMyVocab(VocabularyResponse response, boolean inMyVocab) {
+        return new VocabularyResponse(
+                response.id(),
+                response.term(),
+                response.definition(),
+                response.definitionVi(),
+                response.examples(),
+                response.phonetic(),
+                response.partOfSpeech(),
+                response.language(),
+                response.status(),
+                inMyVocab,
+                response.createdBy(),
+                response.createdAt()
         );
     }
 
@@ -775,6 +831,17 @@ public class VocabularyService {
                     .add(example.getExample());
         }
         return result;
+    }
+
+    private Set<UUID> loadUserVocabularyIds(UUID userId, List<UUID> vocabularyIds) {
+        if (userId == null || vocabularyIds == null || vocabularyIds.isEmpty()) {
+            return Set.of();
+        }
+        Set<UUID> ids = new HashSet<>();
+        for (UserVocabulary userVocabulary : userVocabularyRepository.findByUserIdAndVocabularyIdIn(userId, vocabularyIds)) {
+            ids.add(userVocabulary.getVocabularyId());
+        }
+        return ids;
     }
 
     private String normalizeTerm(String term) {

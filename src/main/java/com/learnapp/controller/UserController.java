@@ -1,23 +1,35 @@
 package com.learnapp.controller;
 
+import com.learnapp.dto.UserActivityLogResponse;
+import com.learnapp.entities.UserActivityTargetType;
+import com.learnapp.entities.UserActivityType;
 import com.learnapp.dto.UpdateMeRequest;
 import com.learnapp.dto.UserResponse;
 import com.learnapp.security.UserPrincipal;
+import com.learnapp.service.UserActivityLogService;
 import com.learnapp.service.UserService;
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class UserController {
 
     private final UserService userService;
+    private final UserActivityLogService userActivityLogService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, UserActivityLogService userActivityLogService) {
         this.userService = userService;
+        this.userActivityLogService = userActivityLogService;
     }
 
     /**
@@ -37,5 +49,20 @@ public class UserController {
             @Valid @RequestBody UpdateMeRequest request
     ) {
         return userService.updateMe(principal.id(), request);
+    }
+
+    /**
+     * Get current user's activity history.
+     */
+    @GetMapping("/me/activity-logs")
+    public Page<UserActivityLogResponse> myActivityLogs(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(required = false) UserActivityType activityType,
+            @RequestParam(required = false) UserActivityTargetType targetType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+            @ParameterObject Pageable pageable
+    ) {
+        return userActivityLogService.listMyActivities(principal.id(), activityType, targetType, from, to, pageable);
     }
 }

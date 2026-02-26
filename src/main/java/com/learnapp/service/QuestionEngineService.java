@@ -11,6 +11,7 @@ import com.learnapp.entities.Vocabulary;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -158,15 +159,14 @@ public class QuestionEngineService {
         Set<String> optionsSet = new LinkedHashSet<>();
         optionsSet.add(vocabulary.getTerm());
 
-        for (Vocabulary distractor : distractors) {
+        List<Vocabulary> rankedDistractors = rankDistractors(vocabulary, distractors);
+        for (Vocabulary distractor : rankedDistractors) {
             if (optionsSet.size() >= 4) {
                 break;
             }
-            if (distractor == null || distractor.getId().equals(vocabulary.getId())) {
-                continue;
-            }
-            if (distractor.getTerm() != null && !distractor.getTerm().isBlank()) {
-                optionsSet.add(distractor.getTerm());
+            String term = distractor.getTerm();
+            if (term != null && !term.isBlank()) {
+                optionsSet.add(term);
             }
         }
 
@@ -185,6 +185,104 @@ public class QuestionEngineService {
         payload.put("correctOption", correctIndex);
         payload.put("expected", vocabulary.getTerm());
         return payload;
+    }
+
+    private List<Vocabulary> rankDistractors(Vocabulary answer, List<Vocabulary> distractors) {
+        if (answer == null || distractors == null || distractors.isEmpty()) {
+            return List.of();
+        }
+
+        String answerNormalized = normalize(answer.getTerm());
+        Set<String> seenTerms = new LinkedHashSet<>();
+        List<Vocabulary> candidates = new ArrayList<>();
+
+        for (Vocabulary distractor : distractors) {
+            if (distractor == null || distractor.getId() == null || distractor.getId().equals(answer.getId())) {
+                continue;
+            }
+            String term = distractor.getTerm();
+            String normalizedTerm = normalize(term);
+            if (normalizedTerm.isBlank() || normalizedTerm.equals(answerNormalized)) {
+                continue;
+            }
+            if (!seenTerms.add(normalizedTerm)) {
+                continue;
+            }
+            candidates.add(distractor);
+        }
+
+        Collections.shuffle(candidates);
+        candidates.sort(Comparator.comparingInt((Vocabulary v) -> distractorSimilarityScore(answer, v)).reversed());
+
+        int topPool = Math.min(candidates.size(), 12);
+        if (topPool > 3) {
+            Collections.shuffle(candidates.subList(0, topPool));
+            candidates.subList(topPool, candidates.size())
+                    .sort(Comparator.comparingInt((Vocabulary v) -> distractorSimilarityScore(answer, v)).reversed());
+        }
+
+        return candidates;
+    }
+
+    private int distractorSimilarityScore(Vocabulary answer, Vocabulary candidate) {
+        if (answer == null || candidate == null) {
+            return 0;
+        }
+
+        String answerTerm = safeLower(answer.getTerm());
+        String candidateTerm = safeLower(candidate.getTerm());
+        int score = 0;
+
+        String answerPos = safeLower(answer.getPartOfSpeech());
+        String candidatePos = safeLower(candidate.getPartOfSpeech());
+        if (!answerPos.isBlank() && answerPos.equals(candidatePos)) {
+            score += 4;
+        }
+
+        int lengthDiff = Math.abs(answerTerm.length() - candidateTerm.length());
+        if (lengthDiff == 0) {
+            score += 3;
+        } else if (lengthDiff <= 2) {
+            score += 2;
+        } else if (lengthDiff <= 4) {
+            score += 1;
+        }
+
+        if (!answerTerm.isBlank() && !candidateTerm.isBlank()) {
+            if (answerTerm.charAt(0) == candidateTerm.charAt(0)) {
+                score += 2;
+            }
+            if (answerTerm.charAt(answerTerm.length() - 1) == candidateTerm.charAt(candidateTerm.length() - 1)) {
+                score += 1;
+            }
+            score += Math.min(3, commonPrefixLength(answerTerm, candidateTerm));
+        }
+
+        if (wordCount(answerTerm) == wordCount(candidateTerm)) {
+            score += 1;
+        }
+
+        return score;
+    }
+
+    private int commonPrefixLength(String a, String b) {
+        int limit = Math.min(a.length(), b.length());
+        int i = 0;
+        while (i < limit && a.charAt(i) == b.charAt(i)) {
+            i++;
+        }
+        return i;
+    }
+
+    private int wordCount(String value) {
+        if (value == null || value.isBlank()) {
+            return 0;
+        }
+        return value.trim().split("\\s+").length;
+    }
+
+    private String safeLower(String value) {
+        return value == null ? "" : value.toLowerCase(Locale.ROOT).trim();
     }
 
     private ObjectNode buildFillMissingPayload(UserVocabulary userVocabulary, Vocabulary vocabulary) {

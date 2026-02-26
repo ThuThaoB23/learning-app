@@ -26,17 +26,20 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
+    private final UserActivityLogService userActivityLogService;
 
     public AuthService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            JwtProperties jwtProperties
+            JwtProperties jwtProperties,
+            UserActivityLogService userActivityLogService
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
+        this.userActivityLogService = userActivityLogService;
     }
 
     public UserResponse register(RegisterRequest request) {
@@ -54,6 +57,7 @@ public class AuthService {
                 .build();
 
         user = userRepository.save(user);
+        userActivityLogService.logRegisterAccount(user);
         return UserMapper.toResponse(user);
     }
 

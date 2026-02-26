@@ -3,9 +3,12 @@ package com.learnapp.controller;
 import com.learnapp.dto.AddUserVocabularyRequest;
 import com.learnapp.dto.UpdateUserVocabularyRequest;
 import com.learnapp.dto.UserVocabularyResponse;
+import com.learnapp.dto.VocabularyContributionResponse;
 import com.learnapp.entities.UserVocabStatus;
+import com.learnapp.entities.VocabularyContributionStatus;
 import com.learnapp.security.UserPrincipal;
 import com.learnapp.service.UserVocabularyService;
+import com.learnapp.service.VocabularyContributionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -31,9 +34,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserVocabularyController {
 
     private final UserVocabularyService userVocabularyService;
+    private final VocabularyContributionService vocabularyContributionService;
 
-    public UserVocabularyController(UserVocabularyService userVocabularyService) {
+    public UserVocabularyController(
+            UserVocabularyService userVocabularyService,
+            VocabularyContributionService vocabularyContributionService
+    ) {
         this.userVocabularyService = userVocabularyService;
+        this.vocabularyContributionService = vocabularyContributionService;
     }
 
     /**
@@ -47,6 +55,16 @@ public class UserVocabularyController {
             @ParameterObject Pageable pageable
     ) {
         return userVocabularyService.listResponses(principal.id(), status, pageable);
+    }
+
+    @Operation(summary = "List my vocab contributions", description = "List vocabulary contributions submitted by the current user.")
+    @GetMapping("/contributions")
+    public Page<VocabularyContributionResponse> listContributions(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(required = false) VocabularyContributionStatus status,
+            @ParameterObject Pageable pageable
+    ) {
+        return vocabularyContributionService.listMine(principal.id(), status, pageable);
     }
 
     /**

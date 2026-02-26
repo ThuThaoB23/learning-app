@@ -1,0 +1,10 @@
+package com.learnapp.entities;
+
+public enum UserActivityType {
+    REGISTER_ACCOUNT,
+    COMPLETE_STUDY_SESSION,
+    ADD_MYVOCAB,
+    SUBMIT_VOCAB_CONTRIBUTION,
+    APPROVE_VOCAB_CONTRIBUTION,
+    REJECT_VOCAB_CONTRIBUTION
+}

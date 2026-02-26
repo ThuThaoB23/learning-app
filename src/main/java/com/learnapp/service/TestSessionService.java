@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -46,6 +47,8 @@ public class TestSessionService {
     private static final int DAILY_WEAK_QUOTA = 4;
     private static final int DAILY_NEW_QUOTA = 2;
     private static final int WEAK_THRESHOLD = 50;
+    private static final int DISTRACTOR_POOL_SIZE = 200;
+    private static final int DISTRACTOR_WINDOW_SIZE = 40;
 
     private final TestSessionRepository testSessionRepository;
     private final TestItemRepository testItemRepository;
@@ -54,6 +57,7 @@ public class TestSessionService {
     private final UserRepository userRepository;
     private final SpacedRepetitionService spacedRepetitionService;
     private final QuestionEngineService questionEngineService;
+    private final UserActivityLogService userActivityLogService;
 
     public TestSessionService(
             TestSessionRepository testSessionRepository,
@@ -62,7 +66,8 @@ public class TestSessionService {
             VocabularyRepository vocabularyRepository,
             UserRepository userRepository,
             SpacedRepetitionService spacedRepetitionService,
-            QuestionEngineService questionEngineService
+            QuestionEngineService questionEngineService,
+            UserActivityLogService userActivityLogService
     ) {
         this.testSessionRepository = testSessionRepository;
         this.testItemRepository = testItemRepository;
@@ -71,6 +76,7 @@ public class TestSessionService {
         this.userRepository = userRepository;
         this.spacedRepetitionService = spacedRepetitionService;
         this.questionEngineService = questionEngineService;
+        this.userActivityLogService = userActivityLogService;
     }
 
     public TestSessionResponse createDailySession(UUID userId) {
@@ -192,6 +198,7 @@ public class TestSessionService {
         session.setStatus(TestSessionStatus.COMPLETED);
         session.setCompletedAt(LocalDateTime.now());
         recalculateSessionStats(session, items);
+        userActivityLogService.logCompleteStudySession(session);
         return toResponse(session, items);
     }
 
@@ -261,6 +268,9 @@ public class TestSessionService {
             vocabById.put(vocabulary.getId(), vocabulary);
         }
 
+        Map<String, List<Vocabulary>> distractorPoolsByLanguage = buildDistractorPoolsByLanguage(vocabularies);
+        Map<String, Integer> distractorOffsetsByLanguage = new HashMap<>();
+
         List<TestItem> items = new ArrayList<>();
         int position = 1;
         for (UserVocabulary userVocabulary : selected) {
@@ -268,12 +278,11 @@ public class TestSessionService {
             if (vocabulary == null) {
                 continue;
             }
-            List<Vocabulary> distractors = vocabularyRepository.findByStatusAndDeletedAtIsNullAndLanguageAndIdNot(
-                    VocabularyStatus.APPROVED,
-                    vocabulary.getLanguage(),
-                    vocabulary.getId(),
-                    PageRequest.of(0, 20)
-            ).getContent();
+            List<Vocabulary> distractors = selectDistractorCandidates(
+                    distractorPoolsByLanguage.get(vocabulary.getLanguage()),
+                    vocabulary,
+                    distractorOffsetsByLanguage
+            );
 
             QuestionEngineService.GeneratedQuestion generated = questionEngineService.generateQuestion(
                     userVocabulary,
@@ -294,6 +303,60 @@ public class TestSessionService {
                     .build());
         }
         return items;
+    }
+
+    private Map<String, List<Vocabulary>> buildDistractorPoolsByLanguage(List<Vocabulary> vocabularies) {
+        Set<String> languages = new HashSet<>();
+        for (Vocabulary vocabulary : vocabularies) {
+            if (vocabulary.getLanguage() != null && !vocabulary.getLanguage().isBlank()) {
+                languages.add(vocabulary.getLanguage());
+            }
+        }
+
+        Map<String, List<Vocabulary>> pools = new HashMap<>();
+        for (String language : languages) {
+            List<Vocabulary> pool = new ArrayList<>(vocabularyRepository.findByStatusAndDeletedAtIsNullAndLanguage(
+                    VocabularyStatus.APPROVED,
+                    language,
+                    PageRequest.of(0, DISTRACTOR_POOL_SIZE)
+            ).getContent());
+            if (!pool.isEmpty()) {
+                Collections.shuffle(pool);
+            }
+            pools.put(language, pool);
+        }
+        return pools;
+    }
+
+    private List<Vocabulary> selectDistractorCandidates(
+            List<Vocabulary> pool,
+            Vocabulary answer,
+            Map<String, Integer> distractorOffsetsByLanguage
+    ) {
+        if (pool == null || pool.isEmpty() || answer == null) {
+            return List.of();
+        }
+
+        String languageKey = answer.getLanguage();
+        int start = distractorOffsetsByLanguage.getOrDefault(languageKey, 0);
+        int windowSize = Math.min(DISTRACTOR_WINDOW_SIZE, pool.size());
+
+        List<Vocabulary> candidates = new ArrayList<>(windowSize);
+        Set<UUID> seenIds = new HashSet<>();
+        for (int i = 0; i < pool.size() && candidates.size() < windowSize; i++) {
+            Vocabulary candidate = pool.get((start + i) % pool.size());
+            if (candidate == null || candidate.getId() == null || candidate.getId().equals(answer.getId())) {
+                continue;
+            }
+            if (!seenIds.add(candidate.getId())) {
+                continue;
+            }
+            candidates.add(candidate);
+        }
+
+        int nextOffset = pool.isEmpty() ? 0 : (start + windowSize) % pool.size();
+        distractorOffsetsByLanguage.put(languageKey, nextOffset);
+        return candidates;
     }
 
     private Comparator<UserVocabulary> byPriority(LocalDate today, ZoneId zoneId) {
@@ -348,6 +411,7 @@ public class TestSessionService {
                         questionEngineService.toPlainJsonPayload(item.getQuestionPayload()),
                         item.getPosition(),
                         item.getStatus(),
+                        resolveExpectedForResponse(session, item),
                         item.getUserAnswer(),
                         item.getAnsweredAt(),
                         item.getTimeMs()
@@ -378,6 +442,16 @@ public class TestSessionService {
                 item.setStatus(TestItemStatus.SKIPPED);
             }
         }
+    }
+
+    private String resolveExpectedForResponse(TestSession session, TestItem item) {
+        boolean canReveal = session.getStatus() != TestSessionStatus.ACTIVE
+                || item.getStatus() != TestItemStatus.PENDING;
+        if (!canReveal || item.getQuestionPayload() == null) {
+            return null;
+        }
+        String expected = item.getQuestionPayload().path("expected").asText(null);
+        return (expected == null || expected.isBlank()) ? null : expected;
     }
 
     private void recalculateSessionStats(TestSession session, List<TestItem> items) {

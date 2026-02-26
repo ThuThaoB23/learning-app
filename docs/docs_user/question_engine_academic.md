@@ -168,6 +168,10 @@ function sampleFromBucket(process):
   - same topic/category if possible
   - similar length/part-of-speech
   - not trivially wrong
+- implementation note (current backend):
+  - build a larger distractor pool per language for the whole session (instead of querying a tiny fixed set per item)
+  - rotate candidate windows across items to reduce repeated options in nearby questions
+  - rank distractors by similarity (part-of-speech, word length, prefix/first letter) then shuffle top candidates for diversity
 
 ### FILL_MISSING_CHARS
 - masked string from term
