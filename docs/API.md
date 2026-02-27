@@ -289,6 +289,34 @@ Body (`UpdateMeRequest`):
 
 Response `200` (`UserResponse`)
 
+### `PATCH /me/avatar` (Auth)
+Upload avatar image for current user (khuyến nghị dùng endpoint này thay vì set `avatarUrl` thủ công trong `PATCH /me`).
+
+Content-Type:
+- `multipart/form-data`
+
+Form-data:
+- `file` (required): avatar image
+
+Validation:
+- max size: `5MB`
+- allowed types: `image/jpeg`, `image/png`, `image/webp`, `image/gif`
+
+Response `200` (`UserResponse`)
+
+Quick test:
+```bash
+curl -X PATCH "http://localhost:8080/me/avatar" \
+  -H "Authorization: Bearer <token>" \
+  -F "file=@/path/to/avatar.png"
+```
+
+Common errors:
+- `400 INVALID_FILE` - thiếu file hoặc file rỗng
+- `400 FILE_TOO_LARGE` - vượt quá 5MB
+- `400 INVALID_FILE_TYPE` - không đúng định dạng ảnh cho phép
+- `500 AVATAR_UPLOAD_FAILED` - upload MinIO thất bại
+
 ### `GET /me/activity-logs` (Auth)
 Get current user's activity history.
 

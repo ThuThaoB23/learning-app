@@ -12,23 +12,34 @@ import com.learnapp.repository.UserRepository;
 import java.util.Locale;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @Transactional
 public class UserService {
 
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AvatarStorageService avatarStorageService;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            AvatarStorageService avatarStorageService
+    ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.avatarStorageService = avatarStorageService;
     }
 
     @Transactional(readOnly = true)
@@ -65,6 +76,25 @@ public class UserService {
         }
 
         user = userRepository.save(user);
+        return UserMapper.toResponse(user);
+    }
+
+    public UserResponse updateMyAvatar(UUID userId, MultipartFile file) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
+        ensureNotDeleted(user);
+
+        String oldAvatarUrl = user.getAvatarUrl();
+        String uploadedAvatarUrl = avatarStorageService.uploadUserAvatar(user.getId(), file);
+
+        user.setAvatarUrl(uploadedAvatarUrl);
+        user = userRepository.save(user);
+
+        if (oldAvatarUrl != null && !oldAvatarUrl.equals(uploadedAvatarUrl)) {
+            avatarStorageService.deleteAvatarByUrl(oldAvatarUrl);
+        }
+
+        log.info("Updated avatar for userId={}", userId);
         return UserMapper.toResponse(user);
     }
 
