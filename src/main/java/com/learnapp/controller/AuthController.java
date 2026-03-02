@@ -33,7 +33,7 @@ public class AuthController {
     }
 
     /**
-     * Authenticate user credentials and return a JWT access token.
+     * Authenticate user credentials by email or username and return a JWT access token.
      */
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {

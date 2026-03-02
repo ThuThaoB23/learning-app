@@ -14,6 +14,14 @@ import org.springframework.data.repository.query.Param;
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByEmail(String email);
 
+    @Query("""
+            select u
+            from User u
+            where lower(u.email) = :identifier
+               or lower(u.username) = :identifier
+            """)
+    Optional<User> findByEmailOrUsername(@Param("identifier") String identifier);
+
     boolean existsByEmail(String email);
 
     Page<User> findByDeletedAtIsNull(Pageable pageable);

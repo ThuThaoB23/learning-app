@@ -248,10 +248,13 @@ Login and receive JWT.
 Body (`LoginRequest`):
 ```json
 {
-  "email": "user@example.com",
+  "identifier": "user@example.com",
   "password": "secret123"
 }
 ```
+Notes:
+- `identifier` accepts either `email` or `username`
+- For backward compatibility, payload cũ dùng field `email` vẫn hoạt động
 
 Response `200` (`LoginResponse`):
 ```json

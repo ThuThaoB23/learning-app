@@ -62,8 +62,8 @@ public class AuthService {
     }
 
     public LoginResponse login(LoginRequest request) {
-        String email = normalizeEmail(request.email());
-        User user = userRepository.findByEmail(email)
+        String identifier = normalizeIdentifier(request.identifier());
+        User user = userRepository.findByEmailOrUsername(identifier)
                 .orElseThrow(() -> new AppException(
                         HttpStatus.UNAUTHORIZED,
                         "INVALID_CREDENTIALS",
@@ -91,5 +91,9 @@ public class AuthService {
 
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeIdentifier(String identifier) {
+        return identifier == null ? null : identifier.trim().toLowerCase(Locale.ROOT);
     }
 }
