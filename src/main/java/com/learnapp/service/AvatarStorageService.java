@@ -1,5 +1,6 @@
 package com.learnapp.service;
 
+import com.learnapp.config.MinioBucketPolicySupport;
 import com.learnapp.config.MinioProperties;
 import com.learnapp.error.AppException;
 import io.minio.BucketExistsArgs;
@@ -7,6 +8,7 @@ import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
+import io.minio.SetBucketPolicyArgs;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.Locale;
@@ -123,6 +125,12 @@ public class AvatarStorageService {
             if (!exists) {
                 minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
             }
+            minioClient.setBucketPolicy(
+                    SetBucketPolicyArgs.builder()
+                            .bucket(bucket)
+                            .config(MinioBucketPolicySupport.buildPublicReadPolicy(bucket))
+                            .build()
+            );
         } catch (Exception ex) {
             log.error(
                     "Cannot access MinIO bucket: endpoint={}, bucket={}, reason={}",

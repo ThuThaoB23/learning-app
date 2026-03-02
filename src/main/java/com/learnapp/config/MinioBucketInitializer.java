@@ -3,6 +3,7 @@ package com.learnapp.config;
 import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
+import io.minio.SetBucketPolicyArgs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -32,13 +33,20 @@ public class MinioBucketInitializer {
 
         try {
             boolean exists = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
-            if (exists) {
+            if (!exists) {
+                minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
+                log.info("Created MinIO bucket: {}", bucket);
+            } else {
                 log.info("MinIO bucket already exists: {}", bucket);
-                return;
             }
 
-            minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
-            log.info("Created MinIO bucket: {}", bucket);
+            minioClient.setBucketPolicy(
+                    SetBucketPolicyArgs.builder()
+                            .bucket(bucket)
+                            .config(MinioBucketPolicySupport.buildPublicReadPolicy(bucket))
+                            .build()
+            );
+            log.info("Applied public-read policy to MinIO bucket: {}", bucket);
         } catch (Exception ex) {
             log.warn("Cannot initialize MinIO bucket '{}': {}", bucket, ex.getMessage());
         }
