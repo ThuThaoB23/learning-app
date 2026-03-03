@@ -84,6 +84,26 @@ Fields:
 
 ---
 
+## VocabularyAudio (`vocabulary_audios`)
+**Entity:** `com.learnapp.entities.VocabularyAudio`
+
+Fields:
+- `id` (UUID)
+- `vocabularyId` (UUID)
+- `audioUrl` (String, URL public của object audio đã upload lên MinIO)
+- `accent` (String, nullable)
+- `position` (Integer, nullable)
+- `createdAt` (LocalDateTime)
+- `updatedAt` (LocalDateTime)
+
+Purpose:
+- Lưu nhiều audio phát âm cho một vocabulary
+- Dữ liệu hiện được tự động sinh từ TTS server nội bộ cho vocabulary tiếng Anh
+- File audio được tải về và lưu lại trên MinIO của hệ thống trước khi ghi `audioUrl` vào DB
+- Hệ thống cũng hỗ trợ user upload audio thủ công cho vocabulary đã duyệt khi nguồn ngoài không có sound
+
+---
+
 ## TopicVocabulary (`topic_vocabularies`)
 **Entity:** `com.learnapp.entities.TopicVocabulary`
 
@@ -166,3 +186,15 @@ Fields:
 Enums:
 - `QuestionType`: `MULTIPLE_CHOICE`, `TRUE_FALSE`, `FILL_MISSING_CHARS`, `TRANSLATE_TO_VI`, `TRANSLATE_TO_EN`, `ACTIVE_RECALL_FULL_WORD`, `CONTEXT_GAP`
 - `TestItemStatus`: `PENDING`, `CORRECT`, `WRONG`, `SKIPPED`
+
+---
+
+## Related Non-Entity Objects Added
+
+Các object sau không phải JPA entity nhưng vừa được thêm để hỗ trợ audio:
+
+- `com.learnapp.dto.VocabularyAudioResponse`
+- `com.learnapp.dto.VocabularyAudioBackfillResponse`
+- `com.learnapp.service.VocabularyAudioService`
+- `com.learnapp.service.VocabularyAudioStorageService`
+- `com.learnapp.config.TextToSpeechProperties`

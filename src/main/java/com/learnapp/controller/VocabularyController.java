@@ -14,6 +14,7 @@ import java.util.UUID;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/vocab")
@@ -83,5 +85,16 @@ public class VocabularyController {
             @Valid @RequestBody CreateVocabularyRequest request
     ) {
         return vocabularyContributionService.submit(principal.id(), request);
+    }
+
+    @Operation(summary = "Upload vocab audio", description = "Upload a manual audio file for an existing approved vocabulary.")
+    @PostMapping(value = "/{id}/audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public VocabularyResponse uploadAudio(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) String accent
+    ) {
+        return vocabularyService.uploadVocabularyAudio(id, file, accent);
     }
 }

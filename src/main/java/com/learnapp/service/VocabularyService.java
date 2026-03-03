@@ -1,7 +1,8 @@
 package com.learnapp.service;
 
-import com.learnapp.dto.UpdateVocabularyRequest;
 import com.learnapp.dto.UpdateVocabularyExampleRequest;
+import com.learnapp.dto.UpdateVocabularyRequest;
+import com.learnapp.dto.VocabularyAudioResponse;
 import com.learnapp.dto.VocabularyDetailResponse;
 import com.learnapp.dto.VocabularyImportErrorResponse;
 import com.learnapp.dto.VocabularyImportResultResponse;
@@ -56,19 +57,22 @@ public class VocabularyService {
     private final TopicVocabularyRepository topicVocabularyRepository;
     private final UserVocabularyRepository userVocabularyRepository;
     private final VocabularyExampleRepository vocabularyExampleRepository;
+    private final VocabularyAudioService vocabularyAudioService;
 
     public VocabularyService(
             VocabularyRepository vocabularyRepository,
             TopicRepository topicRepository,
             TopicVocabularyRepository topicVocabularyRepository,
             UserVocabularyRepository userVocabularyRepository,
-            VocabularyExampleRepository vocabularyExampleRepository
+            VocabularyExampleRepository vocabularyExampleRepository,
+            VocabularyAudioService vocabularyAudioService
     ) {
         this.vocabularyRepository = vocabularyRepository;
         this.topicRepository = topicRepository;
         this.topicVocabularyRepository = topicVocabularyRepository;
         this.userVocabularyRepository = userVocabularyRepository;
         this.vocabularyExampleRepository = vocabularyExampleRepository;
+        this.vocabularyAudioService = vocabularyAudioService;
     }
 
     @Transactional(readOnly = true)
@@ -221,7 +225,7 @@ public class VocabularyService {
     public VocabularyResponse getApproved(UUID id) {
         Vocabulary vocabulary = vocabularyRepository.findByIdAndStatusAndDeletedAtIsNull(id, VocabularyStatus.APPROVED)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "VOCAB_NOT_FOUND", "Vocabulary not found"));
-        return toResponse(vocabulary, loadExamples(vocabulary.getId()));
+        return toResponse(vocabulary, loadExamples(vocabulary.getId()), vocabularyAudioService.loadAudioResponses(vocabulary.getId()));
     }
 
     @Transactional(readOnly = true)
@@ -229,11 +233,12 @@ public class VocabularyService {
         Vocabulary vocabulary = vocabularyRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "VOCAB_NOT_FOUND", "Vocabulary not found"));
         List<String> examples = loadExamples(vocabulary.getId());
+        List<VocabularyAudioResponse> audios = vocabularyAudioService.loadAudioResponses(vocabulary.getId());
         List<UUID> topicIds = topicVocabularyRepository.findByVocabularyId(vocabulary.getId()).stream()
                 .map(TopicVocabulary::getTopicId)
                 .distinct()
                 .toList();
-        return toDetailResponse(vocabulary, examples, topicIds);
+        return toDetailResponse(vocabulary, examples, audios, topicIds);
     }
 
     public VocabularyResponse createContribution(
@@ -299,7 +304,9 @@ public class VocabularyService {
             topicVocabularyRepository.saveAll(links);
         }
 
-        return toResponse(vocabulary, loadExamples(vocabulary.getId()));
+        vocabularyAudioService.populateAudios(vocabulary);
+
+        return toResponse(vocabulary, loadExamples(vocabulary.getId()), vocabularyAudioService.loadAudioResponses(vocabulary.getId()));
     }
 
     public VocabularyImportResultResponse importFromCsv(MultipartFile file) {
@@ -353,7 +360,7 @@ public class VocabularyService {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "VOCAB_NOT_FOUND", "Vocabulary not found"));
         vocabulary.setStatus(VocabularyStatus.APPROVED);
         vocabulary = vocabularyRepository.save(vocabulary);
-        return toResponse(vocabulary, loadExamples(vocabulary.getId()));
+        return toResponse(vocabulary, loadExamples(vocabulary.getId()), vocabularyAudioService.loadAudioResponses(vocabulary.getId()));
     }
 
     public VocabularyResponse reject(UUID id) {
@@ -361,7 +368,27 @@ public class VocabularyService {
                 .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "VOCAB_NOT_FOUND", "Vocabulary not found"));
         vocabulary.setStatus(VocabularyStatus.REJECTED);
         vocabulary = vocabularyRepository.save(vocabulary);
-        return toResponse(vocabulary, loadExamples(vocabulary.getId()));
+        return toResponse(vocabulary, loadExamples(vocabulary.getId()), vocabularyAudioService.loadAudioResponses(vocabulary.getId()));
+    }
+
+    public VocabularyResponse refreshVocabularyAudio(UUID id) {
+        Vocabulary vocabulary = vocabularyRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "VOCAB_NOT_FOUND", "Vocabulary not found"));
+        vocabularyAudioService.refreshAudios(vocabulary);
+        return toResponse(vocabulary, loadExamples(vocabulary.getId()), vocabularyAudioService.loadAudioResponses(vocabulary.getId()));
+    }
+
+    public VocabularyResponse uploadVocabularyAudio(UUID id, MultipartFile file, String accent) {
+        Vocabulary vocabulary = vocabularyRepository.findByIdAndStatusAndDeletedAtIsNull(id, VocabularyStatus.APPROVED)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "VOCAB_NOT_FOUND", "Vocabulary not found"));
+        vocabularyAudioService.addUploadedAudio(vocabulary, file, accent);
+        return toResponse(vocabulary, loadExamples(vocabulary.getId()), vocabularyAudioService.loadAudioResponses(vocabulary.getId()));
+    }
+
+    public void deleteVocabularyAudio(UUID vocabularyId, UUID audioId) {
+        Vocabulary vocabulary = vocabularyRepository.findByIdAndDeletedAtIsNull(vocabularyId)
+                .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "VOCAB_NOT_FOUND", "Vocabulary not found"));
+        vocabularyAudioService.deleteAudio(vocabulary.getId(), audioId);
     }
 
     public VocabularyResponse updateVocabulary(UUID id, UpdateVocabularyRequest request) {
@@ -370,12 +397,14 @@ public class VocabularyService {
 
         String updatedTermNormalized = vocabulary.getTermNormalized();
         String updatedLanguage = vocabulary.getLanguage();
+        boolean shouldRefreshAudios = false;
 
         if (request.term() != null) {
             updatedTermNormalized = normalizeTerm(request.term());
             if (updatedTermNormalized == null) {
                 throw new AppException(HttpStatus.BAD_REQUEST, "INVALID_TERM", "Term is required");
             }
+            shouldRefreshAudios = true;
             vocabulary.setTerm(request.term().trim());
             vocabulary.setTermNormalized(updatedTermNormalized);
         }
@@ -385,6 +414,7 @@ public class VocabularyService {
             if (updatedLanguage == null) {
                 throw new AppException(HttpStatus.BAD_REQUEST, "INVALID_LANGUAGE", "Language is required");
             }
+            shouldRefreshAudios = true;
             vocabulary.setLanguage(updatedLanguage);
         }
 
@@ -427,7 +457,11 @@ public class VocabularyService {
             syncTopicLinks(vocabulary.getId(), request.topicIds());
         }
 
-        return toResponse(vocabulary, loadExamples(vocabulary.getId()));
+        if (shouldRefreshAudios) {
+            vocabularyAudioService.refreshAudios(vocabulary);
+        }
+
+        return toResponse(vocabulary, loadExamples(vocabulary.getId()), vocabularyAudioService.loadAudioResponses(vocabulary.getId()));
     }
 
     public void deleteVocabulary(UUID id) {
@@ -602,6 +636,8 @@ public class VocabularyService {
             vocabularyExampleRepository.saveAll(exampleEntities);
         }
 
+        vocabularyAudioService.populateAudios(vocabulary);
+
         List<String> topicNames = parseTopicNames(record);
         if (!topicNames.isEmpty()) {
             Set<UUID> topicIdSet = resolveOrCreateTopicIds(topicNames);
@@ -751,25 +787,33 @@ public class VocabularyService {
     private Page<VocabularyResponse> toResponses(Page<Vocabulary> page, UUID userId) {
         List<UUID> ids = page.stream().map(Vocabulary::getId).toList();
         Map<UUID, List<String>> examplesByVocab = loadExamples(ids);
+        Map<UUID, List<VocabularyAudioResponse>> audiosByVocab = vocabularyAudioService.loadAudioResponses(ids);
         Set<UUID> myVocabIds = loadUserVocabularyIds(userId, ids);
         return page.map(vocab -> toResponse(
                 vocab,
                 examplesByVocab.getOrDefault(vocab.getId(), List.of()),
+                audiosByVocab.getOrDefault(vocab.getId(), List.of()),
                 userId == null ? null : myVocabIds.contains(vocab.getId())
         ));
     }
 
-    private VocabularyResponse toResponse(Vocabulary vocabulary, List<String> examples) {
-        return toResponse(vocabulary, examples, null);
+    private VocabularyResponse toResponse(Vocabulary vocabulary, List<String> examples, List<VocabularyAudioResponse> audios) {
+        return toResponse(vocabulary, examples, audios, null);
     }
 
-    private VocabularyResponse toResponse(Vocabulary vocabulary, List<String> examples, Boolean inMyVocab) {
+    private VocabularyResponse toResponse(
+            Vocabulary vocabulary,
+            List<String> examples,
+            List<VocabularyAudioResponse> audios,
+            Boolean inMyVocab
+    ) {
         return new VocabularyResponse(
                 vocabulary.getId(),
                 vocabulary.getTerm(),
                 vocabulary.getDefinition(),
                 vocabulary.getDefinitionVi(),
                 examples,
+                audios,
                 vocabulary.getPhonetic(),
                 vocabulary.getPartOfSpeech(),
                 vocabulary.getLanguage(),
@@ -787,6 +831,7 @@ public class VocabularyService {
                 response.definition(),
                 response.definitionVi(),
                 response.examples(),
+                response.audios(),
                 response.phonetic(),
                 response.partOfSpeech(),
                 response.language(),
@@ -797,13 +842,19 @@ public class VocabularyService {
         );
     }
 
-    private VocabularyDetailResponse toDetailResponse(Vocabulary vocabulary, List<String> examples, List<UUID> topicIds) {
+    private VocabularyDetailResponse toDetailResponse(
+            Vocabulary vocabulary,
+            List<String> examples,
+            List<VocabularyAudioResponse> audios,
+            List<UUID> topicIds
+    ) {
         return new VocabularyDetailResponse(
                 vocabulary.getId(),
                 vocabulary.getTerm(),
                 vocabulary.getDefinition(),
                 vocabulary.getDefinitionVi(),
                 examples,
+                audios,
                 vocabulary.getPhonetic(),
                 vocabulary.getPartOfSpeech(),
                 vocabulary.getLanguage(),

@@ -60,6 +60,7 @@ public class VocabularyContributionService {
     private final TopicVocabularyRepository topicVocabularyRepository;
     private final UserRepository userRepository;
     private final UserActivityLogService userActivityLogService;
+    private final VocabularyAudioService vocabularyAudioService;
 
     public VocabularyContributionService(
             VocabularyContributionRepository vocabularyContributionRepository,
@@ -71,7 +72,8 @@ public class VocabularyContributionService {
             TopicRepository topicRepository,
             TopicVocabularyRepository topicVocabularyRepository,
             UserRepository userRepository,
-            UserActivityLogService userActivityLogService
+            UserActivityLogService userActivityLogService,
+            VocabularyAudioService vocabularyAudioService
     ) {
         this.vocabularyContributionRepository = vocabularyContributionRepository;
         this.vocabularyContributionExampleRepository = vocabularyContributionExampleRepository;
@@ -83,6 +85,7 @@ public class VocabularyContributionService {
         this.topicVocabularyRepository = topicVocabularyRepository;
         this.userRepository = userRepository;
         this.userActivityLogService = userActivityLogService;
+        this.vocabularyAudioService = vocabularyAudioService;
     }
 
     public VocabularyContributionResponse submit(UUID contributorUserId, CreateVocabularyRequest request) {
@@ -216,6 +219,7 @@ public class VocabularyContributionService {
 
         List<VocabularyContributionTopic> contributionTopics = vocabularyContributionTopicRepository.findByContributionId(contributionId);
         saveVocabularyTopics(vocabulary.getId(), contributionTopics);
+        vocabularyAudioService.populateAudios(vocabulary);
 
         contribution.setStatus(VocabularyContributionStatus.APPROVED);
         contribution.setReviewedBy(adminUserId);

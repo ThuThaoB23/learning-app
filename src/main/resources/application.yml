@@ -41,3 +41,11 @@ minio:
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+
+tts:
+  enabled: ${TTS_ENABLED:true}
+  base-url: ${TTS_BASE_URL:http://localhost:8000}
+  synthesize-path: ${TTS_SYNTHESIZE_PATH:/tts}
+  min-request-interval-ms: ${TTS_MIN_REQUEST_INTERVAL_MS:0}
+  cooldown-seconds: ${TTS_COOLDOWN_SECONDS:30}
+  default-accent: ${TTS_DEFAULT_ACCENT:us}

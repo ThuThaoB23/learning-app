@@ -1,10 +1,12 @@
 package com.learnapp.controller;
 
 import com.learnapp.dto.UpdateVocabularyRequest;
+import com.learnapp.dto.VocabularyAudioBackfillResponse;
 import com.learnapp.dto.VocabularyDetailResponse;
 import com.learnapp.dto.VocabularyImportResultResponse;
 import com.learnapp.dto.VocabularyResponse;
 import com.learnapp.entities.VocabularyStatus;
+import com.learnapp.service.VocabularyAudioService;
 import com.learnapp.service.VocabularyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,9 +41,11 @@ public class AdminVocabularyController {
     private static final Logger log = LoggerFactory.getLogger(AdminVocabularyController.class);
 
     private final VocabularyService vocabularyService;
+    private final VocabularyAudioService vocabularyAudioService;
 
-    public AdminVocabularyController(VocabularyService vocabularyService) {
+    public AdminVocabularyController(VocabularyService vocabularyService, VocabularyAudioService vocabularyAudioService) {
         this.vocabularyService = vocabularyService;
+        this.vocabularyAudioService = vocabularyAudioService;
     }
 
     /**
@@ -105,6 +109,24 @@ public class AdminVocabularyController {
     }
 
     /**
+     * Refresh audio for a vocabulary entry.
+     */
+    @Operation(summary = "Refresh vocab audio", description = "Fetch and update audio for a single existing vocabulary.")
+    @PostMapping("/{id}/audio/refresh")
+    public VocabularyResponse refreshAudio(@PathVariable UUID id) {
+        log.info("Admin refresh vocabulary audio: id={}", id);
+        return vocabularyService.refreshVocabularyAudio(id);
+    }
+
+    @Operation(summary = "Delete vocab audio", description = "Delete a single audio file from an existing vocabulary.")
+    @DeleteMapping("/{id}/audio/{audioId}")
+    public ResponseEntity<Void> deleteAudio(@PathVariable UUID id, @PathVariable UUID audioId) {
+        log.info("Admin delete vocabulary audio: vocabularyId={}, audioId={}", id, audioId);
+        vocabularyService.deleteVocabularyAudio(id, audioId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
      * Update a vocabulary entry.
      */
     @Operation(summary = "Update vocab", description = "Update vocabulary fields.")
@@ -122,6 +144,29 @@ public class AdminVocabularyController {
     public VocabularyImportResultResponse importCsv(@RequestParam("file") MultipartFile file) {
         log.info("Admin import vocabulary CSV: filename={}, size={}", file.getOriginalFilename(), file.getSize());
         return vocabularyService.importFromCsv(file);
+    }
+
+    /**
+     * Backfill audio for old vocabularies.
+     */
+    @Operation(summary = "Backfill vocab audio", description = "Fetch and store audio for existing vocabularies in batches.")
+    @PostMapping("/audio/backfill")
+    public VocabularyAudioBackfillResponse backfillAudio(
+            @RequestParam(defaultValue = "en") String language,
+            @RequestParam(required = false) VocabularyStatus status,
+            @RequestParam(defaultValue = "false") boolean forceRefresh,
+            @RequestParam(defaultValue = "100") Integer batchSize,
+            @RequestParam(required = false) Integer limit
+    ) {
+        log.info(
+                "Admin backfill vocabulary audio: language={}, status={}, forceRefresh={}, batchSize={}, limit={}",
+                language,
+                status,
+                forceRefresh,
+                batchSize,
+                limit
+        );
+        return vocabularyAudioService.backfillAudios(language, status, forceRefresh, batchSize, limit);
     }
 
     /**

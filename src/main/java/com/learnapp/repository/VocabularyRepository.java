@@ -127,4 +127,26 @@ public interface    VocabularyRepository extends JpaRepository<Vocabulary, UUID>
             @Param("termNormalized") String termNormalized,
             Pageable pageable
     );
+
+    @Query("""
+            select v
+            from Vocabulary v
+            where v.deletedAt is null
+              and (:status is null or v.status = :status)
+              and (:language is null or v.language = :language)
+              and (
+                    :withoutAudioOnly = false
+                    or not exists (
+                        select 1
+                        from VocabularyAudio va
+                        where va.vocabularyId = v.id
+                    )
+              )
+            """)
+    Page<Vocabulary> searchForAudioBackfill(
+            @Param("language") String language,
+            @Param("status") VocabularyStatus status,
+            @Param("withoutAudioOnly") boolean withoutAudioOnly,
+            Pageable pageable
+    );
 }

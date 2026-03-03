@@ -11,6 +11,7 @@ public record VocabularyResponse(
         String definition,
         String definitionVi,
         List<String> examples,
+        List<VocabularyAudioResponse> audios,
         String phonetic,
         String partOfSpeech,
         String language,

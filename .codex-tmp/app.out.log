@@ -1,0 +1,66 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.0.2)
+
+2026-03-03T16:50:21.466+07:00  INFO 34520 --- [learning-app] [  restartedMain] com.learnapp.LearningAppApplication      : Starting LearningAppApplication using Java 17.0.12 with PID 34520 (C:\Users\admin\Desktop\WorkSpace\Learning App\learning-app\target\classes started by admin in C:\Users\admin\Desktop\WorkSpace\Learning App\learning-app)
+2026-03-03T16:50:21.471+07:00  INFO 34520 --- [learning-app] [  restartedMain] com.learnapp.LearningAppApplication      : No active profile set, falling back to 1 default profile: "default"
+2026-03-03T16:50:21.569+07:00  INFO 34520 --- [learning-app] [  restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-03-03T16:50:21.570+07:00  INFO 34520 --- [learning-app] [  restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-03-03T16:50:22.799+07:00  INFO 34520 --- [learning-app] [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-03-03T16:50:22.903+07:00  INFO 34520 --- [learning-app] [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 94 ms. Found 14 JPA repository interfaces.
+2026-03-03T16:50:23.838+07:00  INFO 34520 --- [learning-app] [  restartedMain] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+2026-03-03T16:50:23.852+07:00  INFO 34520 --- [learning-app] [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-03-03T16:50:23.853+07:00  INFO 34520 --- [learning-app] [  restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.15]
+2026-03-03T16:50:23.924+07:00  INFO 34520 --- [learning-app] [  restartedMain] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 2353 ms
+2026-03-03T16:50:24.256+07:00  INFO 34520 --- [learning-app] [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-03-03T16:50:24.461+07:00  INFO 34520 --- [learning-app] [  restartedMain] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@6500b44e
+2026-03-03T16:50:24.465+07:00  INFO 34520 --- [learning-app] [  restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-03-03T16:50:24.518+07:00  INFO 34520 --- [learning-app] [  restartedMain] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:3306/learning_app?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true (MySQL 8.0)
+2026-03-03T16:50:24.611+07:00  INFO 34520 --- [learning-app] [  restartedMain] o.f.core.internal.command.DbValidate     : Successfully validated 10 migrations (execution time 00:00.054s)
+2026-03-03T16:50:24.640+07:00  INFO 34520 --- [learning-app] [  restartedMain] o.f.core.internal.command.DbMigrate      : Current version of schema `learning_app`: 10
+2026-03-03T16:50:24.646+07:00  INFO 34520 --- [learning-app] [  restartedMain] o.f.core.internal.command.DbMigrate      : Schema `learning_app` is up to date. No migration necessary.
+2026-03-03T16:50:24.788+07:00  INFO 34520 --- [learning-app] [  restartedMain] org.hibernate.orm.jpa                    : HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-03-03T16:50:24.876+07:00  INFO 34520 --- [learning-app] [  restartedMain] org.hibernate.orm.core                   : HHH000001: Hibernate ORM core version 7.2.1.Final
+2026-03-03T16:50:25.438+07:00  INFO 34520 --- [learning-app] [  restartedMain] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-03-03T16:50:25.542+07:00  INFO 34520 --- [learning-app] [  restartedMain] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [jdbc:mysql://localhost:3306/learning_app?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true]
+	Database driver: MySQL Connector/J
+	Database dialect: MySQLDialect
+	Database version: 8.0.45
+	Default catalog/schema: learning_app/undefined
+	Autocommit mode: undefined/unknown
+	Isolation level: REPEATABLE_READ [default REPEATABLE_READ]
+	JDBC fetch size: none
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-03-03T16:50:26.793+07:00  INFO 34520 --- [learning-app] [  restartedMain] org.hibernate.orm.core                   : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-03-03T16:50:26.842+07:00  INFO 34520 --- [learning-app] [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-03-03T16:50:26.986+07:00  INFO 34520 --- [learning-app] [  restartedMain] o.s.d.j.r.query.QueryEnhancerFactories   : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-03-03T16:50:31.453+07:00  WARN 34520 --- [learning-app] [  restartedMain] .s.a.UserDetailsServiceAutoConfiguration : 
+
+Using generated security password: d64077da-48ff-4dc4-9d47-984976058fd3
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-03-03T16:50:31.473+07:00  INFO 34520 --- [learning-app] [  restartedMain] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name inMemoryUserDetailsManager
+2026-03-03T16:50:32.889+07:00  INFO 34520 --- [learning-app] [  restartedMain] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8080 (http) with context path '/'
+2026-03-03T16:50:32.900+07:00  INFO 34520 --- [learning-app] [  restartedMain] com.learnapp.LearningAppApplication      : Started LearningAppApplication in 11.943 seconds (process running for 12.7)
+2026-03-03T16:50:33.089+07:00  INFO 34520 --- [learning-app] [  restartedMain] com.learnapp.config.AdminInitializer     : Admin initializer: admin already exists
+2026-03-03T16:50:33.366+07:00  INFO 34520 --- [learning-app] [  restartedMain] c.l.config.MinioBucketInitializer        : MinIO bucket already exists: uploads
+2026-03-03T16:50:33.411+07:00  INFO 34520 --- [learning-app] [  restartedMain] c.l.config.MinioBucketInitializer        : Applied public-read policy to MinIO bucket: uploads
+2026-03-03T16:50:33.411+07:00  WARN 34520 --- [learning-app] [  restartedMain] o.s.core.events.SpringDocAppInitializer  : SpringDoc /v3/api-docs endpoint is enabled by default. To disable it in production, set the property 'springdoc.api-docs.enabled=false'
+2026-03-03T16:50:33.412+07:00  WARN 34520 --- [learning-app] [  restartedMain] o.s.core.events.SpringDocAppInitializer  : SpringDoc /docs endpoint is enabled by default. To disable it in production, set the property 'springdoc.swagger-ui.enabled=false'
+2026-03-03T16:50:48.075+07:00  INFO 34520 --- [learning-app] [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-03-03T16:50:48.078+07:00  INFO 34520 --- [learning-app] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-03-03T16:50:48.080+07:00  INFO 34520 --- [learning-app] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms
+2026-03-03T16:50:48.150+07:00  INFO 34520 --- [learning-app] [nio-8080-exec-1] c.learnapp.config.RequestLoggingFilter   : GET /docs 302 53ms
+2026-03-03T16:50:50.939+07:00  INFO 34520 --- [learning-app] [nio-8080-exec-3] c.learnapp.config.RequestLoggingFilter   : POST /auth/login 200 418ms
+2026-03-03T16:50:51.036+07:00  INFO 34520 --- [learning-app] [nio-8080-exec-5] c.l.c.AdminVocabularyController          : Admin refresh vocabulary audio: id=f6ec7f9b-f454-4316-b08c-8053931ccdbe
+2026-03-03T16:50:54.358+07:00  INFO 34520 --- [learning-app] [nio-8080-exec-5] c.learnapp.config.RequestLoggingFilter   : POST /admin/vocab/f6ec7f9b-f454-4316-b08c-8053931ccdbe/audio/refresh 200 3336ms

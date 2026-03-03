@@ -79,6 +79,7 @@ Trong đó `content` là danh sách object `T`.
 - `definition` (`string`)
 - `definitionVi` (`string | null`)
 - `examples` (`string[]`)
+- `audios` (`VocabularyAudioResponse[]`)
 - `phonetic` (`string | null`)
 - `partOfSpeech` (`string | null`)
 - `language` (`string`)
@@ -87,9 +88,26 @@ Trong đó `content` là danh sách object `T`.
 - `createdBy` (`uuid | null`)
 - `createdAt` (`datetime`)
 
+### `VocabularyAudioResponse`
+- `id` (`uuid`)
+- `audioUrl` (`string`) - URL public của file audio đã được hệ thống tải về và upload lên MinIO
+- `accent` (`string | null`)
+- `position` (`number | null`)
+
 ### `VocabularyDetailResponse`
 - Toàn bộ field của `VocabularyResponse`
 - `topicIds` (`uuid[]`)
+
+### `VocabularyAudioBackfillResponse`
+- `language` (`string`)
+- `status` (`PENDING | APPROVED | REJECTED | null`)
+- `forceRefresh` (`boolean`)
+- `batchSize` (`number`)
+- `limit` (`number | null`)
+- `processed` (`number`)
+- `updated` (`number`)
+- `skipped` (`number`)
+- `failed` (`number`)
 
 ### `VocabularyContributionResponse`
 - `id` (`uuid`)
@@ -544,13 +562,13 @@ Response `200` (`Page<VocabularyResponse>`)
 Notes:
 - Mặc định (`includeMyVocab=false`): vẫn loại các từ đã có trong My Vocab khỏi kết quả.
 - Khi `includeMyVocab=true`: kết quả có thể chứa cả từ đã có trong My Vocab, và dùng `inMyVocab` để phân biệt.
-- `VocabularyResponse` includes `definitionVi` and `examples: [string]`.
+- `VocabularyResponse` includes `definitionVi`, `examples: [string]`, and `audios: [VocabularyAudioResponse]`.
 
 ### `GET /vocab/{id}` (Auth)
 Get approved vocabulary by id.
 
 Response `200` (`VocabularyResponse`)
-Note: `VocabularyResponse` includes `definitionVi` and `examples: [string]`.
+Note: `VocabularyResponse` includes `definitionVi`, `examples: [string]`, and `audios: [VocabularyAudioResponse]`.
 
 ### `POST /vocab/contributions` (Auth)
 Submit a new vocabulary contribution (goes to admin review queue).
@@ -570,6 +588,27 @@ Body (`CreateVocabularyRequest`):
 ```
 
 Response `200` (`VocabularyContributionResponse`)
+
+### `POST /vocab/{id}/audio` (Auth)
+Upload một file audio thủ công cho vocabulary đã duyệt.
+
+Content-Type:
+- `multipart/form-data`
+
+Form-data:
+- `file` (required): audio file
+- `accent` (optional): ví dụ `us`, `uk`
+
+Validation:
+- max size: `10MB`
+- allowed types: `audio/mpeg`, `audio/mp3`, `audio/wav`, `audio/x-wav`, `audio/ogg`, `application/ogg`, `audio/webm`
+
+Response `200` (`VocabularyResponse`)
+
+Notes:
+- Chỉ áp dụng cho vocabulary đang `APPROVED`.
+- File sẽ được upload lên MinIO của hệ thống; `audios[].audioUrl` trả về là URL MinIO.
+- Upload thủ công sẽ thêm một audio mới vào cuối danh sách hiện có, không ghi đè audio cũ.
 
 ---
 
@@ -694,7 +733,7 @@ Response `200` (`text/csv`) with `Content-Disposition: attachment; filename="voc
 Get vocabulary detail by id (including topic links).
 
 Response `200` (`VocabularyDetailResponse`)
-Note: `VocabularyDetailResponse` includes `definitionVi`, `examples: [string]`, and `topicIds: [uuid]`.
+Note: `VocabularyDetailResponse` includes `definitionVi`, `examples: [string]`, `audios: [VocabularyAudioResponse]`, and `topicIds: [uuid]`.
 
 ### `PATCH /admin/vocab/{id}`
 Update vocabulary fields.
@@ -737,6 +776,26 @@ Response `200` (`VocabularyResponse`)
 Reject pending vocabulary.
 
 Response `200` (`VocabularyResponse`)
+
+### `POST /admin/vocab/{id}/audio/refresh`
+Fetch và cập nhật lại audio cho một vocabulary đã tồn tại.
+
+Response `200` (`VocabularyResponse`)
+
+Notes:
+- Chỉ hỗ trợ vocabulary có `language = en`.
+- Nếu API ngoài đang cooldown hoặc lỗi tạm thời, response vẫn trả về vocabulary hiện tại và giữ nguyên audio cũ đã có.
+- Khi refresh thành công, audio mới sẽ được sinh từ TTS server `POST /tts`, upload lên MinIO của hệ thống, rồi `audioUrl` trả về sẽ là URL MinIO.
+
+### `DELETE /admin/vocab/{id}/audio/{audioId}`
+Xoá một audio cụ thể khỏi vocabulary.
+
+Response `204 No Content`
+
+Notes:
+- `audioId` phải thuộc đúng vocabulary `{id}`.
+- Nếu xoá thành công, record audio trong DB sẽ bị xoá và object tương ứng trên MinIO sẽ được dọn.
+- Các audio còn lại sẽ được đánh lại `position` theo thứ tự `1..n`.
 
 ### `POST /admin/vocab/import`
 Bulk import vocabularies from CSV.
@@ -782,6 +841,34 @@ Quick test:
 curl -X POST "http://localhost:8080/admin/vocab/import" \
   -H "Authorization: Bearer <token>" \
   -F "file=@docs/samples/vocabulary-import-sample.csv"
+```
+
+Notes:
+- Với vocabulary `language = en`, hệ thống sẽ tự gọi TTS server `POST /tts` với body `{"text":"<word>"}`, nhận file WAV, upload lên MinIO, rồi lưu URL MinIO vào `audios` sau khi import thành công.
+
+### `POST /admin/vocab/audio/backfill`
+Backfill audio cho vocabulary cũ theo batch.
+
+Query:
+- `language` (optional, default `en`)
+- `status` (optional: `PENDING|APPROVED|REJECTED`)
+- `forceRefresh` (optional, `boolean`, default `false`)
+- `batchSize` (optional, `number`, default `100`, range `1..500`)
+- `limit` (optional, `number`)
+
+Behavior:
+- `forceRefresh=false`: chỉ xử lý vocab chưa có audio.
+- `forceRefresh=true`: quét lại cả vocab đã có audio và thay thế audio hiện tại nếu fetch thành công.
+- Hiện tại chỉ hỗ trợ `language=en`.
+- Nếu API ngoài lỗi tạm thời, hệ thống không xóa audio cũ đã có.
+- Khi tạo audio thành công, hệ thống upload audio lên MinIO và lưu URL MinIO vào DB.
+
+Response `200` (`VocabularyAudioBackfillResponse`)
+
+Quick test:
+```bash
+curl -X POST "http://localhost:8080/admin/vocab/audio/backfill?language=en&status=APPROVED&batchSize=100&limit=500" \
+  -H "Authorization: Bearer <token>"
 ```
 
 ### `DELETE /admin/vocab/{id}`
