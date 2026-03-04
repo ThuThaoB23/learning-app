@@ -398,6 +398,15 @@ public class VocabularyAudioStorageService {
         normalized = normalized.replaceAll("(^-|-$)", "");
         return normalized.isBlank() ? null : normalized;
     }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
     private record RemoteAudioFile(byte[] bytes, String contentType) {
     }
 }
