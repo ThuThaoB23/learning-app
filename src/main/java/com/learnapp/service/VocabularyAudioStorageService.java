@@ -285,10 +285,7 @@ public class VocabularyAudioStorageService {
     }
 
     private String buildObjectUrl(String objectName) {
-        String baseUrl = trimToNull(minioProperties.getPublicUrl());
-        if (baseUrl == null) {
-            baseUrl = trimToNull(minioProperties.getUrl());
-        }
+        String baseUrl = minioProperties.getObjectBaseUrl();
         if (baseUrl == null) {
             throw new AppException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
@@ -297,8 +294,7 @@ public class VocabularyAudioStorageService {
             );
         }
 
-        String normalizedBase = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-        return normalizedBase + "/" + minioProperties.getBucket() + "/" + objectName;
+        return baseUrl + "/" + minioProperties.getBucket() + "/" + objectName;
     }
 
     private String resolveObjectNameFromUrl(String audioUrl) {
@@ -402,15 +398,6 @@ public class VocabularyAudioStorageService {
         normalized = normalized.replaceAll("(^-|-$)", "");
         return normalized.isBlank() ? null : normalized;
     }
-
-    private String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
     private record RemoteAudioFile(byte[] bytes, String contentType) {
     }
 }

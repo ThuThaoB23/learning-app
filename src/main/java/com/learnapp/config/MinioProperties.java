@@ -50,4 +50,30 @@ public class MinioProperties {
     public void setBucket(String bucket) {
         this.bucket = bucket;
     }
+
+    public String getObjectBaseUrl() {
+        String configuredPublicUrl = trimToNull(publicUrl);
+        if (configuredPublicUrl != null) {
+            return normalizeBaseUrl(configuredPublicUrl);
+        }
+
+        String configuredUrl = trimToNull(url);
+        if (configuredUrl != null) {
+            return normalizeBaseUrl(configuredUrl);
+        }
+
+        return null;
+    }
+
+    private String normalizeBaseUrl(String value) {
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
 }

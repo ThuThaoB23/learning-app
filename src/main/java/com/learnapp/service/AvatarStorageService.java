@@ -147,10 +147,7 @@ public class AvatarStorageService {
     }
 
     private String buildObjectUrl(String objectName) {
-        String baseUrl = trimToNull(minioProperties.getPublicUrl());
-        if (baseUrl == null) {
-            baseUrl = trimToNull(minioProperties.getUrl());
-        }
+        String baseUrl = minioProperties.getObjectBaseUrl();
         if (baseUrl == null) {
             throw new AppException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
@@ -159,8 +156,7 @@ public class AvatarStorageService {
             );
         }
 
-        String normalizedBase = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-        return normalizedBase + "/" + minioProperties.getBucket() + "/" + objectName;
+        return baseUrl + "/" + minioProperties.getBucket() + "/" + objectName;
     }
 
     private String resolveObjectNameFromUrl(String avatarUrl) {
@@ -214,13 +210,5 @@ public class AvatarStorageService {
         }
         String extension = originalFilename.substring(lastDot + 1).toLowerCase(Locale.ROOT);
         return ALLOWED_EXTENSIONS.contains(extension) ? ("jpeg".equals(extension) ? "jpg" : extension) : null;
-    }
-
-    private String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
     }
 }

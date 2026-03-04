@@ -33,7 +33,7 @@ springdoc:
 
 minio:
   url: ${MINIO_URL:http://103.176.23.198:9000}
-  public-url: ${MINIO_PUBLIC_URL:http://103.176.23.198:9000}
+  public-url: ${MINIO_PUBLIC_URL:}
   access-key: ${MINIO_ACCESS_KEY:admin}
   secret-key: ${MINIO_SECRET_KEY:StrongPassword123}
   bucket: ${MINIO_BUCKET:uploads}

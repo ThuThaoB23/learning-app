@@ -1,0 +1,2 @@
+minio:
+  public-url: ${MINIO_PUBLIC_URL:https://minio.backtofuture.baby}
