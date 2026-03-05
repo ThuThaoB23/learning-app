@@ -1,6 +1,8 @@
 package com.learnapp.service;
 
 import com.learnapp.dto.SubmitTestItemAnswerResponse;
+import com.learnapp.dto.SubmitTestSessionAnswersRequest;
+import com.learnapp.dto.SubmitTestSessionAnswersResponse;
 import com.learnapp.dto.TestItemResponse;
 import com.learnapp.dto.TestSessionResponse;
 import com.learnapp.entities.TestItem;
@@ -9,6 +11,8 @@ import com.learnapp.entities.TestSession;
 import com.learnapp.entities.TestSessionSourceType;
 import com.learnapp.entities.TestSessionStatus;
 import com.learnapp.entities.TestSessionType;
+import com.learnapp.entities.Topic;
+import com.learnapp.entities.TopicStatus;
 import com.learnapp.entities.User;
 import com.learnapp.entities.UserVocabStatus;
 import com.learnapp.entities.UserVocabulary;
@@ -17,6 +21,8 @@ import com.learnapp.entities.VocabularyStatus;
 import com.learnapp.error.AppException;
 import com.learnapp.repository.TestItemRepository;
 import com.learnapp.repository.TestSessionRepository;
+import com.learnapp.repository.TopicRepository;
+import com.learnapp.repository.TopicVocabularyRepository;
 import com.learnapp.repository.UserRepository;
 import com.learnapp.repository.UserVocabularyRepository;
 import com.learnapp.repository.VocabularyRepository;
@@ -29,6 +35,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -46,6 +53,7 @@ public class TestSessionService {
     private static final int DAILY_DUE_QUOTA = 14;
     private static final int DAILY_WEAK_QUOTA = 4;
     private static final int DAILY_NEW_QUOTA = 2;
+    private static final int TOPIC_DEFAULT_SIZE = 20;
     private static final int WEAK_THRESHOLD = 50;
     private static final int DISTRACTOR_POOL_SIZE = 200;
     private static final int DISTRACTOR_WINDOW_SIZE = 40;
@@ -54,6 +62,8 @@ public class TestSessionService {
     private final TestItemRepository testItemRepository;
     private final UserVocabularyRepository userVocabularyRepository;
     private final VocabularyRepository vocabularyRepository;
+    private final TopicRepository topicRepository;
+    private final TopicVocabularyRepository topicVocabularyRepository;
     private final UserRepository userRepository;
     private final SpacedRepetitionService spacedRepetitionService;
     private final QuestionEngineService questionEngineService;
@@ -64,6 +74,8 @@ public class TestSessionService {
             TestItemRepository testItemRepository,
             UserVocabularyRepository userVocabularyRepository,
             VocabularyRepository vocabularyRepository,
+            TopicRepository topicRepository,
+            TopicVocabularyRepository topicVocabularyRepository,
             UserRepository userRepository,
             SpacedRepetitionService spacedRepetitionService,
             QuestionEngineService questionEngineService,
@@ -73,6 +85,8 @@ public class TestSessionService {
         this.testItemRepository = testItemRepository;
         this.userVocabularyRepository = userVocabularyRepository;
         this.vocabularyRepository = vocabularyRepository;
+        this.topicRepository = topicRepository;
+        this.topicVocabularyRepository = topicVocabularyRepository;
         this.userRepository = userRepository;
         this.spacedRepetitionService = spacedRepetitionService;
         this.questionEngineService = questionEngineService;
@@ -112,6 +126,60 @@ public class TestSessionService {
                 .title("Daily Session " + today)
                 .scheduleDate(today)
                 .sourceType(TestSessionSourceType.DAILY_RULE)
+                .startedAt(LocalDateTime.now())
+                .build();
+        session = testSessionRepository.save(session);
+
+        List<TestItem> items = buildTestItems(selected, session, today, zoneId);
+        if (items.isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "NO_ELIGIBLE_VOCAB", "No approved vocabulary available");
+        }
+        items = testItemRepository.saveAll(items);
+        recalculateSessionStats(session, items);
+
+        return toResponse(session, items);
+    }
+
+    public TestSessionResponse createTopicSession(
+            UUID userId,
+            List<UUID> topicIds,
+            Integer totalItems
+    ) {
+        User user = ensureUserNotDeleted(userId);
+        ZoneId zoneId = resolveZone(user.getTimeZone());
+        LocalDate today = LocalDate.now(zoneId);
+
+        Set<UUID> uniqueTopicIds = new LinkedHashSet<>(topicIds);
+        ensureTopicsAreActive(uniqueTopicIds);
+
+        Set<UUID> vocabularyIds = topicVocabularyRepository.findByTopicIdIn(uniqueTopicIds).stream()
+                .map(topicVocabulary -> topicVocabulary.getVocabularyId())
+                .collect(LinkedHashSet::new, Set::add, Set::addAll);
+        if (vocabularyIds.isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "NO_TOPIC_VOCAB", "No vocabulary found in selected topics");
+        }
+
+        List<UserVocabulary> userItems = userVocabularyRepository.findByUserIdAndVocabularyIdIn(userId, vocabularyIds);
+        if (userItems.isEmpty()) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "NO_USER_VOCAB_IN_TOPICS",
+                    "No user vocabulary found in selected topics"
+            );
+        }
+
+        int requestedItems = totalItems == null ? TOPIC_DEFAULT_SIZE : totalItems;
+        Collections.shuffle(userItems);
+        int limit = Math.min(requestedItems, userItems.size());
+        List<UserVocabulary> selected = new ArrayList<>(userItems.subList(0, limit));
+
+        TestSession session = TestSession.builder()
+                .userId(userId)
+                .type(TestSessionType.CUSTOM)
+                .status(TestSessionStatus.ACTIVE)
+                .title("Topic Session " + today)
+                .scheduleDate(today)
+                .sourceType(TestSessionSourceType.FILTER)
                 .startedAt(LocalDateTime.now())
                 .build();
         session = testSessionRepository.save(session);
@@ -182,6 +250,115 @@ public class TestSessionService {
         );
     }
 
+    public SubmitTestSessionAnswersResponse submitAllAnswers(
+            UUID userId,
+            UUID sessionId,
+            List<SubmitTestSessionAnswersRequest.ItemAnswer> answers
+    ) {
+        TestSession session = findOwnedSession(userId, sessionId);
+        if (session.getStatus() != TestSessionStatus.ACTIVE) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "SESSION_NOT_ACTIVE", "Session is not active");
+        }
+
+        List<TestItem> items = testItemRepository.findByTestSessionIdOrderByPositionAsc(sessionId);
+        Map<UUID, TestItem> itemById = new HashMap<>();
+        for (TestItem item : items) {
+            itemById.put(item.getId(), item);
+        }
+
+        Map<UUID, SubmitTestSessionAnswersRequest.ItemAnswer> answerByItemId = new HashMap<>();
+        for (SubmitTestSessionAnswersRequest.ItemAnswer answer : answers) {
+            if (answerByItemId.putIfAbsent(answer.itemId(), answer) != null) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "DUPLICATE_TEST_ITEM_ANSWER", "Duplicate itemId in answers");
+            }
+        }
+
+        List<TestItem> pendingItems = new ArrayList<>();
+        for (TestItem item : items) {
+            if (item.getStatus() == TestItemStatus.PENDING) {
+                pendingItems.add(item);
+            }
+        }
+
+        for (SubmitTestSessionAnswersRequest.ItemAnswer answer : answers) {
+            TestItem item = itemById.get(answer.itemId());
+            if (item == null) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "TEST_ITEM_NOT_IN_SESSION", "Test item does not belong to session");
+            }
+            if (item.getStatus() != TestItemStatus.PENDING) {
+                throw new AppException(HttpStatus.BAD_REQUEST, "TEST_ITEM_ALREADY_ANSWERED", "Test item already answered");
+            }
+        }
+
+        Map<UUID, UserVocabulary> userVocabularyById = new HashMap<>();
+        for (TestItem item : pendingItems) {
+            UUID userVocabId = item.getUserVocabId();
+            if (userVocabularyById.containsKey(userVocabId)) {
+                continue;
+            }
+            UserVocabulary userVocabulary = userVocabularyRepository.findByIdAndUserId(userVocabId, userId)
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "USER_VOCAB_NOT_FOUND", "User vocabulary not found"));
+            userVocabularyById.put(userVocabId, userVocabulary);
+        }
+
+        Map<UUID, SubmitTestItemAnswerResponse> resultByItemId = new HashMap<>();
+        for (TestItem item : pendingItems) {
+            SubmitTestSessionAnswersRequest.ItemAnswer answer = answerByItemId.get(item.getId());
+            boolean answeredByUser = answer != null;
+            String submittedAnswer = answeredByUser ? answer.answer() : "";
+            UserVocabulary userVocabulary = userVocabularyById.get(item.getUserVocabId());
+            QuestionEngineService.GradeResult grade = questionEngineService.grade(
+                    item.getQuestionType(),
+                    item.getQuestionPayload(),
+                    submittedAnswer
+            );
+            LocalDateTime now = LocalDateTime.now();
+
+            item.setStatus(grade.correct() ? TestItemStatus.CORRECT : TestItemStatus.WRONG);
+            item.setUserAnswer(answeredByUser ? answer.answer() : null);
+            item.setAnsweredAt(now);
+            item.setTimeMs(answeredByUser ? answer.timeMs() : null);
+
+            spacedRepetitionService.applyAttempt(userVocabulary, grade.correct(), now);
+            syncStatusByProcess(userVocabulary);
+
+            String feedback = answeredByUser ? grade.feedback() : "No answer provided";
+
+            resultByItemId.put(item.getId(), new SubmitTestItemAnswerResponse(
+                    item.getId(),
+                    item.getStatus(),
+                    grade.correct(),
+                    grade.expected(),
+                    feedback,
+                    userVocabulary.getProcess(),
+                    userVocabulary.getNextDueAt(),
+                    userVocabulary.getStreak(),
+                    userVocabulary.getRightCount(),
+                    userVocabulary.getWrongCount()
+            ));
+        }
+
+        testItemRepository.saveAll(pendingItems);
+        userVocabularyRepository.saveAll(userVocabularyById.values());
+        recalculateSessionStats(session, items);
+
+        List<SubmitTestItemAnswerResponse> results = pendingItems.stream()
+                .sorted(Comparator.comparing(TestItem::getPosition))
+                .map(item -> resultByItemId.get(item.getId()))
+                .toList();
+
+        return new SubmitTestSessionAnswersResponse(
+                session.getId(),
+                session.getStatus(),
+                session.getTotalItems(),
+                session.getCorrectCount(),
+                session.getWrongCount(),
+                session.getSkippedCount(),
+                session.getScore(),
+                results
+        );
+    }
+
     public TestSessionResponse completeSession(UUID userId, UUID sessionId) {
         TestSession session = findOwnedSession(userId, sessionId);
         if (session.getStatus() == TestSessionStatus.COMPLETED) {
@@ -191,12 +368,13 @@ public class TestSessionService {
             throw new AppException(HttpStatus.BAD_REQUEST, "SESSION_NOT_ACTIVE", "Session was abandoned");
         }
         List<TestItem> items = testItemRepository.findByTestSessionIdOrderByPositionAsc(session.getId());
-        markPendingAsSkipped(items);
+        LocalDateTime now = LocalDateTime.now();
+        markPendingAsWrong(userId, items, now);
         if (!items.isEmpty()) {
             testItemRepository.saveAll(items);
         }
         session.setStatus(TestSessionStatus.COMPLETED);
-        session.setCompletedAt(LocalDateTime.now());
+        session.setCompletedAt(now);
         recalculateSessionStats(session, items);
         userActivityLogService.logCompleteStudySession(session);
         return toResponse(session, items);
@@ -377,6 +555,16 @@ public class TestSessionService {
         }
     }
 
+    private void ensureTopicsAreActive(Set<UUID> topicIds) {
+        for (UUID topicId : topicIds) {
+            Topic topic = topicRepository.findByIdAndDeletedAtIsNull(topicId)
+                    .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "TOPIC_NOT_FOUND", "Topic not found"));
+            if (topic.getStatus() != TopicStatus.ACTIVE) {
+                throw new AppException(HttpStatus.NOT_FOUND, "TOPIC_NOT_FOUND", "Topic not found");
+            }
+        }
+    }
+
     private TestSession findOwnedSession(UUID userId, UUID sessionId) {
         ensureUserNotDeleted(userId);
         return testSessionRepository.findByIdAndUserId(sessionId, userId)
@@ -441,6 +629,35 @@ public class TestSessionService {
             if (item.getStatus() == TestItemStatus.PENDING) {
                 item.setStatus(TestItemStatus.SKIPPED);
             }
+        }
+    }
+
+    private void markPendingAsWrong(UUID userId, List<TestItem> items, LocalDateTime answeredAt) {
+        Map<UUID, UserVocabulary> userVocabularyById = new HashMap<>();
+        for (TestItem item : items) {
+            if (item.getStatus() != TestItemStatus.PENDING) {
+                continue;
+            }
+
+            UUID userVocabId = item.getUserVocabId();
+            UserVocabulary userVocabulary = userVocabularyById.get(userVocabId);
+            if (userVocabulary == null) {
+                userVocabulary = userVocabularyRepository.findByIdAndUserId(userVocabId, userId)
+                        .orElseThrow(() -> new AppException(HttpStatus.NOT_FOUND, "USER_VOCAB_NOT_FOUND", "User vocabulary not found"));
+                userVocabularyById.put(userVocabId, userVocabulary);
+            }
+
+            item.setStatus(TestItemStatus.WRONG);
+            item.setUserAnswer(null);
+            item.setAnsweredAt(answeredAt);
+            item.setTimeMs(null);
+
+            spacedRepetitionService.applyAttempt(userVocabulary, false, answeredAt);
+            syncStatusByProcess(userVocabulary);
+        }
+
+        if (!userVocabularyById.isEmpty()) {
+            userVocabularyRepository.saveAll(userVocabularyById.values());
         }
     }
 

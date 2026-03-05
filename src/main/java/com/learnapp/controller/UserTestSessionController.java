@@ -2,7 +2,10 @@ package com.learnapp.controller;
 
 import com.learnapp.dto.SubmitTestItemAnswerRequest;
 import com.learnapp.dto.SubmitTestItemAnswerResponse;
+import com.learnapp.dto.SubmitTestSessionAnswersRequest;
+import com.learnapp.dto.SubmitTestSessionAnswersResponse;
 import com.learnapp.dto.TestSessionResponse;
+import com.learnapp.dto.CreateTopicSessionRequest;
 import com.learnapp.security.UserPrincipal;
 import com.learnapp.service.TestSessionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,6 +37,19 @@ public class UserTestSessionController {
         return testSessionService.createDailySession(principal.id());
     }
 
+    @Operation(summary = "Create topic session", description = "Create an active practice session from one or more topics.")
+    @PostMapping("/topic")
+    public TestSessionResponse createTopicSession(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody CreateTopicSessionRequest request
+    ) {
+        return testSessionService.createTopicSession(
+                principal.id(),
+                request.topicIds(),
+                request.totalItems()
+        );
+    }
+
     @Operation(summary = "Get session detail", description = "Get a session with ordered items.")
     @GetMapping("/{sessionId}")
     public TestSessionResponse getSession(
@@ -57,6 +73,20 @@ public class UserTestSessionController {
                 itemId,
                 request.answer(),
                 request.timeMs()
+        );
+    }
+
+    @Operation(summary = "Submit all answers", description = "Submit answers for all pending items in one request.")
+    @PostMapping("/{sessionId}/answers")
+    public SubmitTestSessionAnswersResponse submitAllAnswers(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID sessionId,
+            @Valid @RequestBody SubmitTestSessionAnswersRequest request
+    ) {
+        return testSessionService.submitAllAnswers(
+                principal.id(),
+                sessionId,
+                request.answers()
         );
     }
 

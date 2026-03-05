@@ -673,6 +673,25 @@ Create daily session (or return active daily session for today).
 Response `200` (`TestSessionResponse`)
 Note: Response có `items[]`. Mỗi item có field `expected`, nhưng item `PENDING` trong session `ACTIVE` sẽ trả `expected = null`.
 
+### `POST /me/sessions/topic` (Auth)
+Create a topic-based practice session from one or more topics.
+
+Body (`CreateTopicSessionRequest`):
+```json
+{
+  "topicIds": [
+    "7fffd9da-b2bb-4f7a-8f95-ec9827ede9e9",
+    "d872b2ee-31c1-4f5d-a7ab-77f32f2dff4a"
+  ],
+  "totalItems": 30
+}
+```
+
+Response `200` (`TestSessionResponse`)
+Note:
+- `totalItems` optional, mặc định `20` nếu không gửi.
+- Nếu `totalItems` lớn hơn số từ vựng người dùng có trong các topic đã chọn thì hệ thống lấy tất cả.
+
 ### `GET /me/sessions/{sessionId}` (Auth)
 Get test session detail with ordered items.
 
@@ -692,10 +711,37 @@ Body (`SubmitTestItemAnswerRequest`):
 
 Response `200` (`SubmitTestItemAnswerResponse`)
 
+### `POST /me/sessions/{sessionId}/answers` (Auth)
+Submit answers for all `PENDING` items in one request.
+
+Body (`SubmitTestSessionAnswersRequest`):
+```json
+{
+  "answers": [
+    {
+      "itemId": "c9ec91ff-860f-483a-a7fd-56f8f5e9c21a",
+      "answer": "apple",
+      "timeMs": 3200
+    },
+    {
+      "itemId": "da7a7a4c-5414-4d93-954f-06f8de001eb5",
+      "answer": "banana",
+      "timeMs": 2800
+    }
+  ]
+}
+```
+
+Response `200` (`SubmitTestSessionAnswersResponse`)
+Note:
+- Không được trùng `itemId`.
+- Item `PENDING` không có trong `answers` sẽ được tính là trả lời sai.
+
 ### `POST /me/sessions/{sessionId}/complete` (Auth)
 Mark active session as completed.
 
 Response `200` (`TestSessionResponse`)
+Note: Item `PENDING` khi complete sẽ được chấm là `WRONG`.
 
 ### `POST /me/sessions/{sessionId}/abandon` (Auth)
 Mark active session as abandoned.
