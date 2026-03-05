@@ -1,6 +1,7 @@
 package com.learnapp.service;
 
 import com.learnapp.dto.UserVocabularyResponse;
+import com.learnapp.dto.VocabularyAudioResponse;
 import com.learnapp.entities.User;
 import com.learnapp.entities.UserVocabStatus;
 import com.learnapp.entities.UserVocabulary;
@@ -28,6 +29,7 @@ public class UserVocabularyService {
     private final UserVocabularyRepository userVocabularyRepository;
     private final VocabularyRepository vocabularyRepository;
     private final UserRepository userRepository;
+    private final VocabularyAudioService vocabularyAudioService;
     private final SpacedRepetitionService spacedRepetitionService;
     private final UserActivityLogService userActivityLogService;
 
@@ -35,12 +37,14 @@ public class UserVocabularyService {
             UserVocabularyRepository userVocabularyRepository,
             VocabularyRepository vocabularyRepository,
             UserRepository userRepository,
+            VocabularyAudioService vocabularyAudioService,
             SpacedRepetitionService spacedRepetitionService,
             UserActivityLogService userActivityLogService
     ) {
         this.userVocabularyRepository = userVocabularyRepository;
         this.vocabularyRepository = vocabularyRepository;
         this.userRepository = userRepository;
+        this.vocabularyAudioService = vocabularyAudioService;
         this.spacedRepetitionService = spacedRepetitionService;
         this.userActivityLogService = userActivityLogService;
     }
@@ -57,8 +61,14 @@ public class UserVocabularyService {
     @Transactional(readOnly = true)
     public Page<UserVocabularyResponse> listResponses(UUID userId, UserVocabStatus status, Pageable pageable) {
         Page<UserVocabulary> page = list(userId, status, pageable);
-        Map<UUID, String> termsByVocabId = loadTerms(page.stream().map(UserVocabulary::getVocabularyId).toList());
-        return page.map(userVocabulary -> toResponse(userVocabulary, termsByVocabId.get(userVocabulary.getVocabularyId())));
+        List<UUID> vocabularyIds = page.stream().map(UserVocabulary::getVocabularyId).toList();
+        Map<UUID, String> termsByVocabId = loadTerms(vocabularyIds);
+        Map<UUID, List<VocabularyAudioResponse>> audiosByVocabId = vocabularyAudioService.loadAudioResponses(vocabularyIds);
+        return page.map(userVocabulary -> toResponse(
+                userVocabulary,
+                termsByVocabId.get(userVocabulary.getVocabularyId()),
+                audiosByVocabId.getOrDefault(userVocabulary.getVocabularyId(), List.of())
+        ));
     }
 
     public UserVocabulary add(UUID userId, UUID vocabularyId) {
@@ -86,7 +96,8 @@ public class UserVocabularyService {
         String term = vocabularyRepository.findByIdAndDeletedAtIsNull(userVocabulary.getVocabularyId())
                 .map(Vocabulary::getTerm)
                 .orElse(null);
-        return toResponse(userVocabulary, term);
+        List<VocabularyAudioResponse> audios = vocabularyAudioService.loadAudioResponses(userVocabulary.getVocabularyId());
+        return toResponse(userVocabulary, term, audios);
     }
 
     public UserVocabulary update(
@@ -193,10 +204,15 @@ public class UserVocabularyService {
         return termsById;
     }
 
-    private UserVocabularyResponse toResponse(UserVocabulary userVocabulary, String term) {
+    private UserVocabularyResponse toResponse(
+            UserVocabulary userVocabulary,
+            String term,
+            List<VocabularyAudioResponse> audios
+    ) {
         return new UserVocabularyResponse(
                 userVocabulary.getVocabularyId(),
                 term,
+                audios,
                 userVocabulary.getStatus(),
                 userVocabulary.getProcess(),
                 userVocabulary.getLastReviewedAt(),

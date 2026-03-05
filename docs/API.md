@@ -155,6 +155,7 @@ Trong đó `content` là danh sách object `T`.
 ### `UserVocabularyResponse`
 - `vocabularyId` (`uuid`)
 - `term` (`string | null`)
+- `audios` (`VocabularyAudioResponse[]`)
 - `status` (`NEW | LEARNING | MASTERED`)
 - `progress` (`number`, 0..100)
 - `lastReviewedAt` (`datetime | null`)
@@ -622,7 +623,7 @@ Query:
 - `page`, `size`, `sort`
 
 Response `200` (`Page<UserVocabularyResponse>`)
-Note: `UserVocabularyResponse` now includes `term`.
+Note: `UserVocabularyResponse` includes `term` and `audios`.
 
 ### `GET /me/vocab/contributions` (Auth)
 List vocabulary contributions submitted by current user.
