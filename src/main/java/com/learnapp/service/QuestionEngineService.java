@@ -50,21 +50,62 @@ public class QuestionEngineService {
             List<VocabularyAudioResponse> audios
     ) {
         QuestionType chosenType = chooseQuestionType(userVocabulary, sessionType, today, zoneId, audios);
-        ObjectNode payload = switch (chosenType) {
-            case MULTIPLE_CHOICE -> buildMultipleChoicePayload(vocabulary, distractors);
-            case LISTEN_AND_CHOOSE -> buildListenAndChoosePayload(vocabulary, distractors, audios);
-            case FILL_MISSING_CHARS -> buildFillMissingPayload(userVocabulary, vocabulary);
-            case TRANSLATE_TO_VI -> buildTranslateToViPayload(vocabulary);
-            case ACTIVE_RECALL_FULL_WORD -> buildActiveRecallPayload(userVocabulary, vocabulary, today, zoneId);
-            case TRANSLATE_TO_EN, TRUE_FALSE, CONTEXT_GAP -> buildTranslateToEnPayload(vocabulary);
-        };
+        ObjectNode payload = buildPayload(
+                chosenType,
+                userVocabulary,
+                vocabulary,
+                today,
+                zoneId,
+                distractors,
+                audios
+        );
 
         if (payload == null) {
-            payload = buildTranslateToEnPayload(vocabulary);
             chosenType = QuestionType.TRANSLATE_TO_EN;
+            payload = buildPayload(
+                    chosenType,
+                    userVocabulary,
+                    vocabulary,
+                    today,
+                    zoneId,
+                    distractors,
+                    audios
+            );
         }
 
         return new GeneratedQuestion(chosenType, payload);
+    }
+
+    public GeneratedQuestion generateQuestion(
+            UserVocabulary userVocabulary,
+            Vocabulary vocabulary,
+            TestSessionType sessionType,
+            LocalDate today,
+            ZoneId zoneId,
+            List<Vocabulary> distractors,
+            List<VocabularyAudioResponse> audios,
+            List<QuestionType> preferredTypes
+    ) {
+        if (preferredTypes == null || preferredTypes.isEmpty()) {
+            return generateQuestion(userVocabulary, vocabulary, sessionType, today, zoneId, distractors, audios);
+        }
+
+        for (QuestionType preferredType : preferredTypes) {
+            ObjectNode payload = buildPayload(
+                    preferredType,
+                    userVocabulary,
+                    vocabulary,
+                    today,
+                    zoneId,
+                    distractors,
+                    audios
+            );
+            if (payload != null) {
+                return new GeneratedQuestion(preferredType, payload);
+            }
+        }
+
+        return null;
     }
 
     public QuestionType chooseQuestionType(
@@ -135,6 +176,25 @@ public class QuestionEngineService {
 
     public Object toPlainJsonPayload(JsonNode payload) {
         return objectMapper.convertValue(sanitizeForClient(payload), Object.class);
+    }
+
+    private ObjectNode buildPayload(
+            QuestionType questionType,
+            UserVocabulary userVocabulary,
+            Vocabulary vocabulary,
+            LocalDate today,
+            ZoneId zoneId,
+            List<Vocabulary> distractors,
+            List<VocabularyAudioResponse> audios
+    ) {
+        return switch (questionType) {
+            case MULTIPLE_CHOICE -> buildMultipleChoicePayload(vocabulary, distractors);
+            case LISTEN_AND_CHOOSE -> buildListenAndChoosePayload(vocabulary, distractors, audios);
+            case FILL_MISSING_CHARS -> buildFillMissingPayload(userVocabulary, vocabulary);
+            case TRANSLATE_TO_VI -> buildTranslateToViPayload(vocabulary);
+            case ACTIVE_RECALL_FULL_WORD -> buildActiveRecallPayload(userVocabulary, vocabulary, today, zoneId);
+            case TRANSLATE_TO_EN, TRUE_FALSE, CONTEXT_GAP -> buildTranslateToEnPayload(vocabulary);
+        };
     }
 
     private QuestionType sampleFromBucket(int process, boolean hasAudio) {

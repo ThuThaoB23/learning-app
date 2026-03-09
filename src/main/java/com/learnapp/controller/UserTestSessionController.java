@@ -1,11 +1,12 @@
 package com.learnapp.controller;
 
+import com.learnapp.dto.CreateSelectedVocabularySessionRequest;
+import com.learnapp.dto.CreateTopicSessionRequest;
 import com.learnapp.dto.SubmitTestItemAnswerRequest;
 import com.learnapp.dto.SubmitTestItemAnswerResponse;
 import com.learnapp.dto.SubmitTestSessionAnswersRequest;
 import com.learnapp.dto.SubmitTestSessionAnswersResponse;
 import com.learnapp.dto.TestSessionResponse;
-import com.learnapp.dto.CreateTopicSessionRequest;
 import com.learnapp.security.UserPrincipal;
 import com.learnapp.service.TestSessionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,6 +48,19 @@ public class UserTestSessionController {
                 principal.id(),
                 request.topicIds(),
                 request.totalItems()
+        );
+    }
+
+    @Operation(summary = "Create selected vocab session", description = "Create an active practice session from user-selected vocabulary and question types.")
+    @PostMapping("/vocab")
+    public TestSessionResponse createSelectedVocabularySession(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody CreateSelectedVocabularySessionRequest request
+    ) {
+        return testSessionService.createSelectedVocabularySession(
+                principal.id(),
+                request.vocabularyIds(),
+                request.questionTypes()
         );
     }
 

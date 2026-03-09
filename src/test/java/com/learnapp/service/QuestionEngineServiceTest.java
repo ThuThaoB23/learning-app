@@ -128,4 +128,38 @@ class QuestionEngineServiceTest {
 
         assertTrue(producedListenAndChoose);
     }
+
+    @Test
+    void generateQuestionShouldFallbackWithinPreferredQuestionTypes() {
+        UserVocabulary userVocabulary = UserVocabulary.builder()
+                .process(25)
+                .build();
+        Vocabulary vocabulary = Vocabulary.builder()
+                .id(UUID.randomUUID())
+                .term("apple")
+                .definition("A fruit")
+                .definitionVi("Qua tao")
+                .language("en")
+                .build();
+        List<Vocabulary> distractors = List.of(
+                Vocabulary.builder().id(UUID.randomUUID()).term("apply").language("en").build(),
+                Vocabulary.builder().id(UUID.randomUUID()).term("ample").language("en").build(),
+                Vocabulary.builder().id(UUID.randomUUID()).term("maple").language("en").build()
+        );
+
+        QuestionEngineService.GeneratedQuestion question = service.generateQuestion(
+                userVocabulary,
+                vocabulary,
+                TestSessionType.SET_PRACTICE,
+                LocalDate.of(2026, 3, 9),
+                ZoneId.of("UTC"),
+                distractors,
+                List.of(),
+                List.of(QuestionType.LISTEN_AND_CHOOSE, QuestionType.FILL_MISSING_CHARS)
+        );
+
+        assertEquals(QuestionType.FILL_MISSING_CHARS, question.type());
+        assertEquals("apple", question.payload().path("expected").asText());
+        assertTrue(question.payload().has("maskedTerm"));
+    }
 }

@@ -5,6 +5,7 @@ import com.learnapp.dto.SubmitTestSessionAnswersRequest;
 import com.learnapp.dto.SubmitTestSessionAnswersResponse;
 import com.learnapp.dto.TestItemResponse;
 import com.learnapp.dto.TestSessionResponse;
+import com.learnapp.entities.QuestionType;
 import com.learnapp.entities.TestItem;
 import com.learnapp.entities.TestItemStatus;
 import com.learnapp.entities.TestSession;
@@ -33,11 +34,13 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
@@ -57,6 +60,14 @@ public class TestSessionService {
     private static final int WEAK_THRESHOLD = 50;
     private static final int DISTRACTOR_POOL_SIZE = 200;
     private static final int DISTRACTOR_WINDOW_SIZE = 40;
+    private static final Set<QuestionType> USER_SELECTED_QUESTION_TYPES = EnumSet.of(
+            QuestionType.MULTIPLE_CHOICE,
+            QuestionType.LISTEN_AND_CHOOSE,
+            QuestionType.FILL_MISSING_CHARS,
+            QuestionType.TRANSLATE_TO_VI,
+            QuestionType.TRANSLATE_TO_EN,
+            QuestionType.ACTIVE_RECALL_FULL_WORD
+    );
 
     private final TestSessionRepository testSessionRepository;
     private final TestItemRepository testItemRepository;
@@ -197,6 +208,70 @@ public class TestSessionService {
         return toResponse(session, items);
     }
 
+    public TestSessionResponse createSelectedVocabularySession(
+            UUID userId,
+            List<UUID> vocabularyIds,
+            List<QuestionType> questionTypes
+    ) {
+        User user = ensureUserNotDeleted(userId);
+        ZoneId zoneId = resolveZone(user.getTimeZone());
+        LocalDate today = LocalDate.now(zoneId);
+
+        List<UUID> uniqueVocabularyIds = new ArrayList<>(new LinkedHashSet<>(vocabularyIds));
+        List<QuestionType> selectedQuestionTypes = new ArrayList<>(new LinkedHashSet<>(questionTypes));
+        validateSelectedQuestionTypes(selectedQuestionTypes);
+
+        List<UserVocabulary> userItems = userVocabularyRepository.findByUserIdAndVocabularyIdIn(userId, uniqueVocabularyIds);
+        if (userItems.isEmpty()) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "NO_SELECTED_USER_VOCAB",
+                    "No user vocabulary found for selected ids"
+            );
+        }
+
+        Map<UUID, UserVocabulary> userItemByVocabularyId = new HashMap<>();
+        for (UserVocabulary userItem : userItems) {
+            userItemByVocabularyId.putIfAbsent(userItem.getVocabularyId(), userItem);
+        }
+
+        List<UUID> missingVocabularyIds = uniqueVocabularyIds.stream()
+                .filter(vocabularyId -> !userItemByVocabularyId.containsKey(vocabularyId))
+                .toList();
+        if (!missingVocabularyIds.isEmpty()) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "VOCAB_NOT_IN_USER_LIST",
+                    "Some selected vocabulary ids are not in the user's list",
+                    Map.of("missingVocabularyIds", missingVocabularyIds)
+            );
+        }
+
+        List<UserVocabulary> selected = uniqueVocabularyIds.stream()
+                .map(userItemByVocabularyId::get)
+                .toList();
+
+        TestSession session = TestSession.builder()
+                .userId(userId)
+                .type(TestSessionType.SET_PRACTICE)
+                .status(TestSessionStatus.ACTIVE)
+                .title("Selected Vocabulary Session " + today)
+                .scheduleDate(today)
+                .sourceType(TestSessionSourceType.USER_SET)
+                .startedAt(LocalDateTime.now())
+                .build();
+        session = testSessionRepository.save(session);
+
+        List<TestItem> items = buildTestItems(selected, session, today, zoneId, selectedQuestionTypes, true);
+        if (items.isEmpty()) {
+            throw new AppException(HttpStatus.BAD_REQUEST, "NO_ELIGIBLE_VOCAB", "No approved vocabulary available");
+        }
+        items = testItemRepository.saveAll(items);
+        recalculateSessionStats(session, items);
+
+        return toResponse(session, items);
+    }
+
     @Transactional(readOnly = true)
     public TestSessionResponse getSession(UUID userId, UUID sessionId) {
         TestSession session = findOwnedSession(userId, sessionId);
@@ -293,6 +368,20 @@ public class TestSessionService {
             }
         }
 
+        List<UUID> missingItemIds = pendingItems.stream()
+                .map(TestItem::getId)
+                .filter(Objects::nonNull)
+                .filter(itemId -> !answerByItemId.containsKey(itemId))
+                .toList();
+        if (!missingItemIds.isEmpty()) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "MISSING_TEST_ITEM_ANSWERS",
+                    "Missing answers for pending test items",
+                    Map.of("missingItemIds", missingItemIds)
+            );
+        }
+
         Map<UUID, UserVocabulary> userVocabularyById = new HashMap<>();
         for (TestItem item : pendingItems) {
             UUID userVocabId = item.getUserVocabId();
@@ -307,32 +396,28 @@ public class TestSessionService {
         Map<UUID, SubmitTestItemAnswerResponse> resultByItemId = new HashMap<>();
         for (TestItem item : pendingItems) {
             SubmitTestSessionAnswersRequest.ItemAnswer answer = answerByItemId.get(item.getId());
-            boolean answeredByUser = answer != null;
-            String submittedAnswer = answeredByUser ? answer.answer() : "";
             UserVocabulary userVocabulary = userVocabularyById.get(item.getUserVocabId());
             QuestionEngineService.GradeResult grade = questionEngineService.grade(
                     item.getQuestionType(),
                     item.getQuestionPayload(),
-                    submittedAnswer
+                    answer.answer()
             );
             LocalDateTime now = LocalDateTime.now();
 
             item.setStatus(grade.correct() ? TestItemStatus.CORRECT : TestItemStatus.WRONG);
-            item.setUserAnswer(answeredByUser ? answer.answer() : null);
+            item.setUserAnswer(answer.answer());
             item.setAnsweredAt(now);
-            item.setTimeMs(answeredByUser ? answer.timeMs() : null);
+            item.setTimeMs(answer.timeMs());
 
             spacedRepetitionService.applyAttempt(userVocabulary, grade.correct(), now);
             syncStatusByProcess(userVocabulary);
-
-            String feedback = answeredByUser ? grade.feedback() : "No answer provided";
 
             resultByItemId.put(item.getId(), new SubmitTestItemAnswerResponse(
                     item.getId(),
                     item.getStatus(),
                     grade.correct(),
                     grade.expected(),
-                    feedback,
+                    grade.feedback(),
                     userVocabulary.getProcess(),
                     userVocabulary.getNextDueAt(),
                     userVocabulary.getStreak(),
@@ -442,11 +527,36 @@ public class TestSessionService {
             LocalDate today,
             ZoneId zoneId
     ) {
+        return buildTestItems(selected, session, today, zoneId, null, false);
+    }
+
+    private List<TestItem> buildTestItems(
+            List<UserVocabulary> selected,
+            TestSession session,
+            LocalDate today,
+            ZoneId zoneId,
+            List<QuestionType> preferredQuestionTypes,
+            boolean requireAllSelected
+    ) {
         List<UUID> vocabIds = selected.stream().map(UserVocabulary::getVocabularyId).toList();
         List<Vocabulary> vocabularies = vocabularyRepository.findByIdInAndStatusAndDeletedAtIsNull(vocabIds, VocabularyStatus.APPROVED);
         Map<UUID, Vocabulary> vocabById = new HashMap<>();
         for (Vocabulary vocabulary : vocabularies) {
             vocabById.put(vocabulary.getId(), vocabulary);
+        }
+
+        if (requireAllSelected) {
+            List<UUID> unavailableVocabularyIds = vocabIds.stream()
+                    .filter(vocabularyId -> !vocabById.containsKey(vocabularyId))
+                    .toList();
+            if (!unavailableVocabularyIds.isEmpty()) {
+                throw new AppException(
+                        HttpStatus.BAD_REQUEST,
+                        "SELECTED_VOCAB_NOT_AVAILABLE",
+                        "Some selected vocabulary is unavailable for testing",
+                        Map.of("missingVocabularyIds", unavailableVocabularyIds)
+                );
+            }
         }
 
         Map<String, List<Vocabulary>> distractorPoolsByLanguage = buildDistractorPoolsByLanguage(vocabularies);
@@ -455,6 +565,7 @@ public class TestSessionService {
                 vocabularyAudioService.loadAudioResponses(vocabIds);
 
         List<TestItem> items = new ArrayList<>();
+        List<UUID> unsupportedVocabularyIds = new ArrayList<>();
         int position = 1;
         for (UserVocabulary userVocabulary : selected) {
             Vocabulary vocabulary = vocabById.get(userVocabulary.getVocabularyId());
@@ -467,15 +578,36 @@ public class TestSessionService {
                     distractorOffsetsByLanguage
             );
 
-            QuestionEngineService.GeneratedQuestion generated = questionEngineService.generateQuestion(
-                    userVocabulary,
-                    vocabulary,
-                    session.getType(),
-                    today,
-                    zoneId,
-                    distractors,
-                    audiosByVocabId.getOrDefault(vocabulary.getId(), List.of())
-            );
+            QuestionEngineService.GeneratedQuestion generated;
+            if (preferredQuestionTypes == null || preferredQuestionTypes.isEmpty()) {
+                generated = questionEngineService.generateQuestion(
+                        userVocabulary,
+                        vocabulary,
+                        session.getType(),
+                        today,
+                        zoneId,
+                        distractors,
+                        audiosByVocabId.getOrDefault(vocabulary.getId(), List.of())
+                );
+            } else {
+                generated = questionEngineService.generateQuestion(
+                        userVocabulary,
+                        vocabulary,
+                        session.getType(),
+                        today,
+                        zoneId,
+                        distractors,
+                        audiosByVocabId.getOrDefault(vocabulary.getId(), List.of()),
+                        rotateQuestionTypes(preferredQuestionTypes, position - 1)
+                );
+            }
+
+            if (generated == null) {
+                if (requireAllSelected) {
+                    unsupportedVocabularyIds.add(vocabulary.getId());
+                }
+                continue;
+            }
 
             items.add(TestItem.builder()
                     .testSessionId(session.getId())
@@ -486,6 +618,19 @@ public class TestSessionService {
                     .status(TestItemStatus.PENDING)
                     .build());
         }
+
+        if (requireAllSelected && !unsupportedVocabularyIds.isEmpty()) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "QUESTION_TYPE_NOT_SUPPORTED_FOR_SELECTED_VOCAB",
+                    "Selected question types are not available for some vocabulary",
+                    Map.of(
+                            "unsupportedVocabularyIds", unsupportedVocabularyIds,
+                            "questionTypes", preferredQuestionTypes.stream().map(Enum::name).toList()
+                    )
+            );
+        }
+
         return items;
     }
 
@@ -569,6 +714,37 @@ public class TestSessionService {
                 throw new AppException(HttpStatus.NOT_FOUND, "TOPIC_NOT_FOUND", "Topic not found");
             }
         }
+    }
+
+    private void validateSelectedQuestionTypes(List<QuestionType> questionTypes) {
+        List<String> unsupportedQuestionTypes = questionTypes.stream()
+                .filter(questionType -> !USER_SELECTED_QUESTION_TYPES.contains(questionType))
+                .map(Enum::name)
+                .toList();
+        if (!unsupportedQuestionTypes.isEmpty()) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "UNSUPPORTED_QUESTION_TYPE",
+                    "Some selected question types are not supported for manual sessions",
+                    Map.of(
+                            "unsupportedQuestionTypes", unsupportedQuestionTypes,
+                            "supportedQuestionTypes", USER_SELECTED_QUESTION_TYPES.stream().map(Enum::name).toList()
+                    )
+            );
+        }
+    }
+
+    private List<QuestionType> rotateQuestionTypes(List<QuestionType> questionTypes, int offset) {
+        if (questionTypes == null || questionTypes.isEmpty()) {
+            return List.of();
+        }
+        int size = questionTypes.size();
+        int start = Math.floorMod(offset, size);
+        List<QuestionType> rotated = new ArrayList<>(size);
+        for (int i = 0; i < size; i++) {
+            rotated.add(questionTypes.get((start + i) % size));
+        }
+        return rotated;
     }
 
     private TestSession findOwnedSession(UUID userId, UUID sessionId) {

@@ -742,6 +742,30 @@ Note:
 - `totalItems` optional, mặc định `20` nếu không gửi.
 - Nếu `totalItems` lớn hơn số từ vựng người dùng có trong các topic đã chọn thì hệ thống lấy tất cả.
 
+### `POST /me/sessions/vocab` (Auth)
+Create a practice session from the exact vocabulary list and question types the user selected.
+
+Body (`CreateSelectedVocabularySessionRequest`):
+```json
+{
+  "vocabularyIds": [
+    "7fffd9da-b2bb-4f7a-8f95-ec9827ede9e9",
+    "d872b2ee-31c1-4f5d-a7ab-77f32f2dff4a"
+  ],
+  "questionTypes": [
+    "TRANSLATE_TO_EN",
+    "FILL_MISSING_CHARS"
+  ]
+}
+```
+
+Response `200` (`TestSessionResponse`)
+Note:
+- Chỉ chấp nhận các question type: `MULTIPLE_CHOICE`, `LISTEN_AND_CHOOSE`, `FILL_MISSING_CHARS`, `TRANSLATE_TO_VI`, `TRANSLATE_TO_EN`, `ACTIVE_RECALL_FULL_WORD`.
+- `vocabularyIds` phải thuộc danh sách từ vựng của chính user; nếu không, API trả `400` với error code `VOCAB_NOT_IN_USER_LIST` và `details.missingVocabularyIds`.
+- Nếu một vocabulary không tạo được với các `questionTypes` đã chọn, API trả `400` với error code `QUESTION_TYPE_NOT_SUPPORTED_FOR_SELECTED_VOCAB` và `details.unsupportedVocabularyIds`.
+- Session được tạo với `type = SET_PRACTICE` và `sourceType = USER_SET`.
+
 ### `GET /me/sessions/{sessionId}` (Auth)
 Get test session detail with ordered items.
 
@@ -785,7 +809,8 @@ Body (`SubmitTestSessionAnswersRequest`):
 Response `200` (`SubmitTestSessionAnswersResponse`)
 Note:
 - Không được trùng `itemId`.
-- Item `PENDING` không có trong `answers` sẽ được tính là trả lời sai.
+- Phải gửi answer cho tất cả item đang `PENDING`.
+- Nếu thiếu item, API trả `400` với error code `MISSING_TEST_ITEM_ANSWERS` và `details.missingItemIds`.
 
 ### `POST /me/sessions/{sessionId}/complete` (Auth)
 Mark active session as completed.
