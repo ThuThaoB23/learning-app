@@ -67,6 +67,7 @@ public class TestSessionService {
     private final UserRepository userRepository;
     private final SpacedRepetitionService spacedRepetitionService;
     private final QuestionEngineService questionEngineService;
+    private final VocabularyAudioService vocabularyAudioService;
     private final UserActivityLogService userActivityLogService;
 
     public TestSessionService(
@@ -79,6 +80,7 @@ public class TestSessionService {
             UserRepository userRepository,
             SpacedRepetitionService spacedRepetitionService,
             QuestionEngineService questionEngineService,
+            VocabularyAudioService vocabularyAudioService,
             UserActivityLogService userActivityLogService
     ) {
         this.testSessionRepository = testSessionRepository;
@@ -90,6 +92,7 @@ public class TestSessionService {
         this.userRepository = userRepository;
         this.spacedRepetitionService = spacedRepetitionService;
         this.questionEngineService = questionEngineService;
+        this.vocabularyAudioService = vocabularyAudioService;
         this.userActivityLogService = userActivityLogService;
     }
 
@@ -448,6 +451,8 @@ public class TestSessionService {
 
         Map<String, List<Vocabulary>> distractorPoolsByLanguage = buildDistractorPoolsByLanguage(vocabularies);
         Map<String, Integer> distractorOffsetsByLanguage = new HashMap<>();
+        Map<UUID, List<com.learnapp.dto.VocabularyAudioResponse>> audiosByVocabId =
+                vocabularyAudioService.loadAudioResponses(vocabIds);
 
         List<TestItem> items = new ArrayList<>();
         int position = 1;
@@ -468,7 +473,8 @@ public class TestSessionService {
                     session.getType(),
                     today,
                     zoneId,
-                    distractors
+                    distractors,
+                    audiosByVocabId.getOrDefault(vocabulary.getId(), List.of())
             );
 
             items.add(TestItem.builder()

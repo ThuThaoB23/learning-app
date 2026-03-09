@@ -207,10 +207,11 @@ Trong đó `content` là danh sách object `T`.
 
 ### `TestItemResponse`
 - `id` (`uuid`)
-- `questionType` (`MULTIPLE_CHOICE | TRUE_FALSE | FILL_MISSING_CHARS | TRANSLATE_TO_VI | TRANSLATE_TO_EN | ACTIVE_RECALL_FULL_WORD | CONTEXT_GAP`)
+- `questionType` (`MULTIPLE_CHOICE | LISTEN_AND_CHOOSE | TRUE_FALSE | FILL_MISSING_CHARS | TRANSLATE_TO_VI | TRANSLATE_TO_EN | ACTIVE_RECALL_FULL_WORD | CONTEXT_GAP`)
 - `questionPayload` (`object/json`)  
   Ví dụ tùy loại câu hỏi:
   - multiple choice: `{ "prompt": "...", "options": ["...", "...", "...", "..."] }`
+  - listen and choose: `{ "prompt": "Listen and choose the correct word", "audioUrl": "...", "accent": "us", "options": ["...", "...", "...", "..."] }`
   - fill missing: `{ "prompt": "...", "maskedTerm": "a__le" }`
   - translate/recall: `{ "prompt": "...", "hint": "a" }` (`hint` có thể không có)
 - `position` (`number`, bắt đầu từ 1)
@@ -669,6 +670,7 @@ Response `200` (`FlashcardDeckResponse`)
 Notes:
 - Deck ưu tiên chọn từ theo nhóm `DUE`, `WEAK`, `NEW`, sau đó fill thêm `REVIEW` theo `priorityScore`.
 - `groups[]` cho biết số lượng item trong từng bucket được trả về ở `items[]`.
+- Hệ thống lưu lịch sử 2 deck gần nhất xuống DB và cố gắng tránh lặp lại các `userVocabularyId` vừa trả trong khoảng 30 phút, nếu còn đủ ứng viên thay thế.
 - Có thể trả `400 NO_USER_VOCAB` nếu user chưa có từ nào trong my vocab.
 - Có thể trả `400 NO_ELIGIBLE_VOCAB` nếu không còn vocabulary `APPROVED` hợp lệ để build deck.
 

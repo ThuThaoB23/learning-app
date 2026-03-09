@@ -31,6 +31,16 @@ public class FlashcardSelectionService {
             LocalDate today,
             ZoneId zoneId
     ) {
+        return select(allItems, limit, today, zoneId, Set.of());
+    }
+
+    public List<SelectedFlashcard> select(
+            List<UserVocabulary> allItems,
+            int limit,
+            LocalDate today,
+            ZoneId zoneId,
+            Set<UUID> recentlyServedIds
+    ) {
         if (allItems == null || allItems.isEmpty() || limit <= 0) {
             return List.of();
         }
@@ -46,15 +56,15 @@ public class FlashcardSelectionService {
 
         List<SelectedFlashcard> dueItems = rankedItems.stream()
                 .filter(item -> item.bucket() == FlashcardDeckBucket.DUE)
-                .sorted(byPriority())
+                .sorted(byPriority(recentlyServedIds))
                 .toList();
         List<SelectedFlashcard> weakItems = rankedItems.stream()
                 .filter(item -> item.bucket() == FlashcardDeckBucket.WEAK)
-                .sorted(byPriority())
+                .sorted(byPriority(recentlyServedIds))
                 .toList();
         List<SelectedFlashcard> newItems = rankedItems.stream()
                 .filter(item -> item.bucket() == FlashcardDeckBucket.NEW)
-                .sorted(byNewness())
+                .sorted(byNewness(recentlyServedIds))
                 .toList();
 
         int dueQuota = calculateDueQuota(limit);
@@ -71,7 +81,7 @@ public class FlashcardSelectionService {
         if (selected.size() < limit) {
             List<SelectedFlashcard> remaining = rankedItems.stream()
                     .filter(item -> !pickedIds.contains(item.userVocabulary().getId()))
-                    .sorted(byPriority())
+                    .sorted(byPriority(recentlyServedIds))
                     .toList();
             pick(remaining, limit - selected.size(), selected, pickedIds);
         }
@@ -92,14 +102,15 @@ public class FlashcardSelectionService {
         return FlashcardDeckBucket.REVIEW;
     }
 
-    private Comparator<SelectedFlashcard> byPriority() {
-        return Comparator.comparingDouble(SelectedFlashcard::priorityScore)
-                .reversed()
+    private Comparator<SelectedFlashcard> byPriority(Set<UUID> recentlyServedIds) {
+        return Comparator.comparing((SelectedFlashcard item) -> isRecentlyServed(item, recentlyServedIds))
+                .thenComparing(SelectedFlashcard::priorityScore, Comparator.reverseOrder())
                 .thenComparing(item -> item.userVocabulary().getCreatedAt(), Comparator.nullsLast(Comparator.naturalOrder()));
     }
 
-    private Comparator<SelectedFlashcard> byNewness() {
-        return Comparator.comparing(
+    private Comparator<SelectedFlashcard> byNewness(Set<UUID> recentlyServedIds) {
+        return Comparator.comparing((SelectedFlashcard item) -> isRecentlyServed(item, recentlyServedIds))
+                .thenComparing(
                 item -> item.userVocabulary().getCreatedAt(),
                 Comparator.nullsLast(Comparator.naturalOrder())
         );
@@ -138,6 +149,11 @@ public class FlashcardSelectionService {
 
     private int nullSafe(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private boolean isRecentlyServed(SelectedFlashcard item, Set<UUID> recentlyServedIds) {
+        UUID userVocabularyId = item.userVocabulary().getId();
+        return userVocabularyId != null && recentlyServedIds.contains(userVocabularyId);
     }
 
     public record SelectedFlashcard(

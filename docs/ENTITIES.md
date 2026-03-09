@@ -138,6 +138,21 @@ Enums:
 
 ---
 
+## UserFlashcardDeckHistory (`user_flashcard_deck_histories`)
+**Entity:** `com.learnapp.entities.UserFlashcardDeckHistory`
+
+Fields:
+- `id` (UUID)
+- `userId` (UUID)
+- `servedVocabularyIds` (JsonNode, JSON array of `userVocabularyId`)
+- `totalItems` (Integer)
+- `createdAt` (LocalDateTime)
+
+Purpose:
+- Lưu 2 deck flashcard gần nhất theo user để API `/me/vocab/flashcards` tránh lặp lại các từ vừa được trả ở các lần gọi liên tiếp, kể cả sau khi app restart.
+
+---
+
 ## TestSession (`test_sessions`)
 **Entity:** `com.learnapp.entities.TestSession`
 
@@ -184,7 +199,7 @@ Fields:
 - `createdAt` (LocalDateTime)
 
 Enums:
-- `QuestionType`: `MULTIPLE_CHOICE`, `TRUE_FALSE`, `FILL_MISSING_CHARS`, `TRANSLATE_TO_VI`, `TRANSLATE_TO_EN`, `ACTIVE_RECALL_FULL_WORD`, `CONTEXT_GAP`
+- `QuestionType`: `MULTIPLE_CHOICE`, `LISTEN_AND_CHOOSE`, `TRUE_FALSE`, `FILL_MISSING_CHARS`, `TRANSLATE_TO_VI`, `TRANSLATE_TO_EN`, `ACTIVE_RECALL_FULL_WORD`, `CONTEXT_GAP`
 - `TestItemStatus`: `PENDING`, `CORRECT`, `WRONG`, `SKIPPED`
 
 ---

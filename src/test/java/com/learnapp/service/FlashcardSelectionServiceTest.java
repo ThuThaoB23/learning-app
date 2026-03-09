@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,6 +64,27 @@ class FlashcardSelectionServiceTest {
         assertEquals(3, selected.size());
         assertEquals(FlashcardDeckBucket.NEW, selected.get(0).bucket());
         assertTrue(selected.stream().anyMatch(item -> item.bucket() == FlashcardDeckBucket.REVIEW));
+    }
+
+    @Test
+    void selectShouldAvoidRecentlyServedItemsWhenAlternativesExist() {
+        LocalDate today = LocalDate.of(2026, 3, 9);
+        ZoneId zoneId = ZoneId.of("UTC");
+
+        UserVocabulary dueOne = userVocabulary(10, LocalDateTime.of(2026, 3, 1, 8, 0), LocalDateTime.of(2026, 3, 5, 8, 0), 1);
+        UserVocabulary dueTwo = userVocabulary(20, LocalDateTime.of(2026, 3, 2, 8, 0), LocalDateTime.of(2026, 3, 4, 8, 0), 2);
+        UserVocabulary dueThree = userVocabulary(30, LocalDateTime.of(2026, 3, 3, 8, 0), LocalDateTime.of(2026, 3, 3, 8, 0), 3);
+
+        List<FlashcardSelectionService.SelectedFlashcard> selected = service.select(
+                List.of(dueOne, dueTwo, dueThree),
+                2,
+                today,
+                zoneId,
+                Set.of(dueOne.getId(), dueTwo.getId())
+        );
+
+        assertEquals(2, selected.size());
+        assertEquals(dueThree.getId(), selected.get(0).userVocabulary().getId());
     }
 
     private UserVocabulary userVocabulary(

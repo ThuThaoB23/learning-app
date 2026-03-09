@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.learnapp.dto.VocabularyAudioResponse;
 import com.learnapp.entities.QuestionType;
 import com.learnapp.entities.TestSessionType;
 import com.learnapp.entities.UserVocabulary;
@@ -25,6 +26,7 @@ public class QuestionEngineService {
 
     private static final List<QuestionType> DIFFICULTY_LADDER = List.of(
             QuestionType.MULTIPLE_CHOICE,
+            QuestionType.LISTEN_AND_CHOOSE,
             QuestionType.FILL_MISSING_CHARS,
             QuestionType.TRANSLATE_TO_VI,
             QuestionType.TRANSLATE_TO_EN,
@@ -44,11 +46,13 @@ public class QuestionEngineService {
             TestSessionType sessionType,
             LocalDate today,
             ZoneId zoneId,
-            List<Vocabulary> distractors
+            List<Vocabulary> distractors,
+            List<VocabularyAudioResponse> audios
     ) {
-        QuestionType chosenType = chooseQuestionType(userVocabulary, sessionType, today, zoneId);
+        QuestionType chosenType = chooseQuestionType(userVocabulary, sessionType, today, zoneId, audios);
         ObjectNode payload = switch (chosenType) {
             case MULTIPLE_CHOICE -> buildMultipleChoicePayload(vocabulary, distractors);
+            case LISTEN_AND_CHOOSE -> buildListenAndChoosePayload(vocabulary, distractors, audios);
             case FILL_MISSING_CHARS -> buildFillMissingPayload(userVocabulary, vocabulary);
             case TRANSLATE_TO_VI -> buildTranslateToViPayload(vocabulary);
             case ACTIVE_RECALL_FULL_WORD -> buildActiveRecallPayload(userVocabulary, vocabulary, today, zoneId);
@@ -67,10 +71,11 @@ public class QuestionEngineService {
             UserVocabulary userVocabulary,
             TestSessionType sessionType,
             LocalDate today,
-            ZoneId zoneId
+            ZoneId zoneId,
+            List<VocabularyAudioResponse> audios
     ) {
         int process = nullSafe(userVocabulary.getProcess());
-        QuestionType base = sampleFromBucket(process);
+        QuestionType base = sampleFromBucket(process, audios != null && !audios.isEmpty());
 
         if (sessionType == TestSessionType.NEW_WORDS) {
             base = oneStepEasier(base);
@@ -93,7 +98,7 @@ public class QuestionEngineService {
         String expected = payload.path("expected").asText("");
         String normalizedExpected = normalize(expected);
 
-        if (questionType == QuestionType.MULTIPLE_CHOICE) {
+        if (questionType == QuestionType.MULTIPLE_CHOICE || questionType == QuestionType.LISTEN_AND_CHOOSE) {
             int correctOption = payload.path("correctOption").asInt(-1);
             JsonNode optionsNode = payload.path("options");
             String chosenText = "";
@@ -132,27 +137,36 @@ public class QuestionEngineService {
         return objectMapper.convertValue(sanitizeForClient(payload), Object.class);
     }
 
-    private QuestionType sampleFromBucket(int process) {
+    private QuestionType sampleFromBucket(int process, boolean hasAudio) {
         if (process <= 30) {
-            return weightedSample(List.of(
-                    weighted(QuestionType.MULTIPLE_CHOICE, 0.60),
-                    weighted(QuestionType.FILL_MISSING_CHARS, 0.25),
-                    weighted(QuestionType.TRANSLATE_TO_VI, 0.15)
-            ));
+            List<WeightedQuestionType> weights = new ArrayList<>();
+            weights.add(weighted(QuestionType.MULTIPLE_CHOICE, hasAudio ? 0.45 : 0.60));
+            if (hasAudio) {
+                weights.add(weighted(QuestionType.LISTEN_AND_CHOOSE, 0.20));
+            }
+            weights.add(weighted(QuestionType.FILL_MISSING_CHARS, hasAudio ? 0.20 : 0.25));
+            weights.add(weighted(QuestionType.TRANSLATE_TO_VI, 0.15));
+            return weightedSample(weights);
         }
         if (process <= 70) {
-            return weightedSample(List.of(
-                    weighted(QuestionType.FILL_MISSING_CHARS, 0.40),
-                    weighted(QuestionType.TRANSLATE_TO_VI, 0.30),
-                    weighted(QuestionType.TRANSLATE_TO_EN, 0.25),
-                    weighted(QuestionType.MULTIPLE_CHOICE, 0.05)
-            ));
+            List<WeightedQuestionType> weights = new ArrayList<>();
+            weights.add(weighted(QuestionType.FILL_MISSING_CHARS, 0.30));
+            if (hasAudio) {
+                weights.add(weighted(QuestionType.LISTEN_AND_CHOOSE, 0.20));
+            }
+            weights.add(weighted(QuestionType.TRANSLATE_TO_VI, 0.25));
+            weights.add(weighted(QuestionType.TRANSLATE_TO_EN, 0.20));
+            weights.add(weighted(QuestionType.MULTIPLE_CHOICE, hasAudio ? 0.05 : 0.25));
+            return weightedSample(weights);
         }
-        return weightedSample(List.of(
-                weighted(QuestionType.TRANSLATE_TO_EN, 0.55),
-                weighted(QuestionType.ACTIVE_RECALL_FULL_WORD, 0.35),
-                weighted(QuestionType.TRANSLATE_TO_VI, 0.10)
-        ));
+        List<WeightedQuestionType> weights = new ArrayList<>();
+        weights.add(weighted(QuestionType.TRANSLATE_TO_EN, 0.45));
+        weights.add(weighted(QuestionType.ACTIVE_RECALL_FULL_WORD, 0.30));
+        if (hasAudio) {
+            weights.add(weighted(QuestionType.LISTEN_AND_CHOOSE, 0.15));
+        }
+        weights.add(weighted(QuestionType.TRANSLATE_TO_VI, hasAudio ? 0.10 : 0.25));
+        return weightedSample(weights);
     }
 
     private ObjectNode buildMultipleChoicePayload(Vocabulary vocabulary, List<Vocabulary> distractors) {
@@ -184,6 +198,32 @@ public class QuestionEngineService {
         options.forEach(arrayNode::add);
         payload.put("correctOption", correctIndex);
         payload.put("expected", vocabulary.getTerm());
+        return payload;
+    }
+
+    private ObjectNode buildListenAndChoosePayload(
+            Vocabulary vocabulary,
+            List<Vocabulary> distractors,
+            List<VocabularyAudioResponse> audios
+    ) {
+        if (audios == null || audios.isEmpty()) {
+            return null;
+        }
+        VocabularyAudioResponse audio = audios.get(0);
+        if (audio == null || audio.audioUrl() == null || audio.audioUrl().isBlank()) {
+            return null;
+        }
+
+        ObjectNode payload = buildMultipleChoicePayload(vocabulary, distractors);
+        if (payload == null) {
+            return null;
+        }
+
+        payload.put("prompt", "Listen and choose the correct word");
+        payload.put("audioUrl", audio.audioUrl());
+        if (audio.accent() != null && !audio.accent().isBlank()) {
+            payload.put("accent", audio.accent());
+        }
         return payload;
     }
 

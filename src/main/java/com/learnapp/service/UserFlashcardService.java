@@ -1,27 +1,36 @@
 package com.learnapp.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.learnapp.dto.FlashcardDeckBucket;
 import com.learnapp.dto.FlashcardDeckGroupResponse;
 import com.learnapp.dto.FlashcardDeckResponse;
 import com.learnapp.dto.FlashcardItemResponse;
+import com.learnapp.entities.UserFlashcardDeckHistory;
 import com.learnapp.dto.VocabularyAudioResponse;
 import com.learnapp.entities.User;
 import com.learnapp.entities.Vocabulary;
 import com.learnapp.entities.VocabularyExample;
 import com.learnapp.entities.VocabularyStatus;
 import com.learnapp.error.AppException;
+import com.learnapp.repository.UserFlashcardDeckHistoryRepository;
 import com.learnapp.repository.UserRepository;
 import com.learnapp.repository.UserVocabularyRepository;
 import com.learnapp.repository.VocabularyExampleRepository;
 import com.learnapp.repository.VocabularyRepository;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +40,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserFlashcardService {
 
     public static final int DEFAULT_LIMIT = 20;
+    private static final int RECENT_DECK_HISTORY_LIMIT = 2;
+    private static final int RECENT_DECK_TTL_MINUTES = 30;
 
     private final UserRepository userRepository;
+    private final UserFlashcardDeckHistoryRepository userFlashcardDeckHistoryRepository;
     private final UserVocabularyRepository userVocabularyRepository;
     private final VocabularyRepository vocabularyRepository;
     private final VocabularyExampleRepository vocabularyExampleRepository;
@@ -41,6 +53,7 @@ public class UserFlashcardService {
 
     public UserFlashcardService(
             UserRepository userRepository,
+            UserFlashcardDeckHistoryRepository userFlashcardDeckHistoryRepository,
             UserVocabularyRepository userVocabularyRepository,
             VocabularyRepository vocabularyRepository,
             VocabularyExampleRepository vocabularyExampleRepository,
@@ -48,6 +61,7 @@ public class UserFlashcardService {
             FlashcardSelectionService flashcardSelectionService
     ) {
         this.userRepository = userRepository;
+        this.userFlashcardDeckHistoryRepository = userFlashcardDeckHistoryRepository;
         this.userVocabularyRepository = userVocabularyRepository;
         this.vocabularyRepository = vocabularyRepository;
         this.vocabularyExampleRepository = vocabularyExampleRepository;
@@ -55,16 +69,20 @@ public class UserFlashcardService {
         this.flashcardSelectionService = flashcardSelectionService;
     }
 
+    @Transactional
     public FlashcardDeckResponse buildDeck(UUID userId, int limit) {
         User user = ensureUserNotDeleted(userId);
         ZoneId zoneId = resolveZone(user.getTimeZone());
         LocalDate today = LocalDate.now(zoneId);
+        LocalDateTime now = LocalDateTime.now();
+        Set<UUID> recentlyServedIds = loadRecentlyServedIds(userId, now);
 
         List<FlashcardSelectionService.SelectedFlashcard> selected = flashcardSelectionService.select(
                 userVocabularyRepository.findByUserId(userId),
                 limit,
                 today,
-                zoneId
+                zoneId,
+                recentlyServedIds
         );
         if (selected.isEmpty()) {
             throw new AppException(HttpStatus.BAD_REQUEST, "NO_USER_VOCAB", "No vocabulary found in user list");
@@ -111,6 +129,8 @@ public class UserFlashcardService {
         if (items.isEmpty()) {
             throw new AppException(HttpStatus.BAD_REQUEST, "NO_ELIGIBLE_VOCAB", "No approved vocabulary available");
         }
+
+        rememberDeck(userId, items, now);
 
         return new FlashcardDeckResponse(
                 limit,
@@ -171,5 +191,55 @@ public class UserFlashcardService {
         } catch (Exception ex) {
             return ZoneId.systemDefault();
         }
+    }
+
+    private Set<UUID> loadRecentlyServedIds(UUID userId, LocalDateTime now) {
+        LocalDateTime cutoff = now.minusMinutes(RECENT_DECK_TTL_MINUTES);
+        List<UserFlashcardDeckHistory> histories = userFlashcardDeckHistoryRepository
+                .findByUserIdAndCreatedAtAfterOrderByCreatedAtDesc(
+                        userId,
+                        cutoff,
+                        PageRequest.of(0, RECENT_DECK_HISTORY_LIMIT)
+                )
+                .getContent();
+        if (histories.isEmpty()) {
+            return Set.of();
+        }
+        Set<UUID> servedIds = new HashSet<>();
+        for (UserFlashcardDeckHistory history : histories) {
+            JsonNode jsonNode = history.getServedVocabularyIds();
+            if (jsonNode == null || !jsonNode.isArray()) {
+                continue;
+            }
+            for (JsonNode value : jsonNode) {
+                if (value == null || value.asText().isBlank()) {
+                    continue;
+                }
+                try {
+                    servedIds.add(UUID.fromString(value.asText()));
+                } catch (IllegalArgumentException ignored) {
+                    // Ignore malformed persisted values instead of failing deck generation.
+                }
+            }
+        }
+        return servedIds;
+    }
+
+    private void rememberDeck(UUID userId, List<FlashcardItemResponse> items, LocalDateTime now) {
+        ArrayNode servedIds = JsonNodeFactory.instance.arrayNode();
+        for (FlashcardItemResponse item : items) {
+            if (item.userVocabularyId() != null) {
+                servedIds.add(item.userVocabularyId().toString());
+            }
+        }
+        if (servedIds.isEmpty()) {
+            return;
+        }
+        userFlashcardDeckHistoryRepository.saveAndFlush(UserFlashcardDeckHistory.builder()
+                .userId(userId)
+                .servedVocabularyIds(servedIds)
+                .totalItems(items.size())
+                .createdAt(now)
+                .build());
     }
 }
