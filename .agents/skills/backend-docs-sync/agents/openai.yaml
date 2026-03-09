@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Docs Sync"
+  short_description: "Keep API and entity docs updated when backend contracts change."
+  default_prompt: "Use this skill when backend API, DTO, entity, migration, repository, service, or controller changes require documentation updates in docs/API.md or docs/ENTITIES.md."

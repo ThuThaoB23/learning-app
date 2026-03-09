@@ -1,23 +1,28 @@
 package com.learnapp.controller;
 
 import com.learnapp.dto.AddUserVocabularyRequest;
+import com.learnapp.dto.FlashcardDeckResponse;
 import com.learnapp.dto.UpdateUserVocabularyRequest;
 import com.learnapp.dto.UserVocabularyResponse;
 import com.learnapp.dto.VocabularyContributionResponse;
 import com.learnapp.entities.UserVocabStatus;
 import com.learnapp.entities.VocabularyContributionStatus;
 import com.learnapp.security.UserPrincipal;
+import com.learnapp.service.UserFlashcardService;
 import com.learnapp.service.UserVocabularyService;
 import com.learnapp.service.VocabularyContributionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -29,18 +34,22 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@Validated
 @RequestMapping("/me/vocab")
 @Tag(name = "User Vocabulary", description = "Personal vocabulary list APIs")
 public class UserVocabularyController {
 
     private final UserVocabularyService userVocabularyService;
+    private final UserFlashcardService userFlashcardService;
     private final VocabularyContributionService vocabularyContributionService;
 
     public UserVocabularyController(
             UserVocabularyService userVocabularyService,
+            UserFlashcardService userFlashcardService,
             VocabularyContributionService vocabularyContributionService
     ) {
         this.userVocabularyService = userVocabularyService;
+        this.userFlashcardService = userFlashcardService;
         this.vocabularyContributionService = vocabularyContributionService;
     }
 
@@ -55,6 +64,15 @@ public class UserVocabularyController {
             @ParameterObject Pageable pageable
     ) {
         return userVocabularyService.listResponses(principal.id(), status, pageable);
+    }
+
+    @Operation(summary = "Get my flashcards", description = "Build a flashcard deck from the user's vocabulary list.")
+    @GetMapping("/flashcards")
+    public FlashcardDeckResponse flashcards(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit
+    ) {
+        return userFlashcardService.buildDeck(principal.id(), limit);
     }
 
     @Operation(summary = "List my vocab contributions", description = "List vocabulary contributions submitted by the current user.")

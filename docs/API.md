@@ -162,6 +162,39 @@ Trong đó `content` là danh sách object `T`.
 - `createdAt` (`datetime`)
 - `updatedAt` (`datetime`)
 
+### `FlashcardDeckBucket`
+- `DUE` - từ đã tới hạn ôn
+- `WEAK` - từ chưa tới hạn nhưng còn yếu (`progress <= 50`)
+- `NEW` - từ chưa có lịch sử review hoặc chưa có `nextDueAt`
+- `REVIEW` - từ còn lại được fill thêm theo độ ưu tiên
+
+### `FlashcardDeckGroupResponse`
+- `bucket` (`DUE | WEAK | NEW | REVIEW`)
+- `count` (`number`)
+
+### `FlashcardItemResponse`
+- `userVocabularyId` (`uuid`)
+- `vocabularyId` (`uuid`)
+- `bucket` (`DUE | WEAK | NEW | REVIEW`)
+- `term` (`string`)
+- `definition` (`string`)
+- `definitionVi` (`string | null`)
+- `examples` (`string[]`)
+- `audios` (`VocabularyAudioResponse[]`)
+- `phonetic` (`string | null`)
+- `partOfSpeech` (`string | null`)
+- `language` (`string`)
+- `status` (`NEW | LEARNING | MASTERED`)
+- `progress` (`number`, 0..100)
+- `lastReviewedAt` (`datetime | null`)
+- `nextDueAt` (`datetime | null`)
+
+### `FlashcardDeckResponse`
+- `requestedLimit` (`number`)
+- `totalItems` (`number`)
+- `groups` (`FlashcardDeckGroupResponse[]`)
+- `items` (`FlashcardItemResponse[]`)
+
 ### `UserActivityLogResponse`
 - `id` (`uuid`)
 - `userId` (`uuid`)
@@ -624,6 +657,20 @@ Query:
 
 Response `200` (`Page<UserVocabularyResponse>`)
 Note: `UserVocabularyResponse` includes `term` and `audios`.
+
+### `GET /me/vocab/flashcards` (Auth)
+Build a flashcard deck from current user's my-vocab list.
+
+Query:
+- `limit` (optional, default `20`, min `1`, max `100`)
+
+Response `200` (`FlashcardDeckResponse`)
+
+Notes:
+- Deck ưu tiên chọn từ theo nhóm `DUE`, `WEAK`, `NEW`, sau đó fill thêm `REVIEW` theo `priorityScore`.
+- `groups[]` cho biết số lượng item trong từng bucket được trả về ở `items[]`.
+- Có thể trả `400 NO_USER_VOCAB` nếu user chưa có từ nào trong my vocab.
+- Có thể trả `400 NO_ELIGIBLE_VOCAB` nếu không còn vocabulary `APPROVED` hợp lệ để build deck.
 
 ### `GET /me/vocab/contributions` (Auth)
 List vocabulary contributions submitted by current user.
