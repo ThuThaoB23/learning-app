@@ -204,12 +204,67 @@ Enums:
 
 ---
 
+## UserFeedback (`user_feedbacks`)
+**Entity:** `com.learnapp.entities.UserFeedback`
+
+Fields:
+- `id` (UUID)
+- `userId` (UUID)
+- `category` (UserFeedbackCategory)
+- `title` (String, nullable)
+- `message` (String)
+- `status` (UserFeedbackStatus)
+- `sourceScreen` (String, nullable)
+- `appVersion` (String, nullable)
+- `deviceInfo` (String, nullable)
+- `locale` (String, nullable)
+- `readBy` (UUID, nullable)
+- `readAt` (LocalDateTime, nullable)
+- `archivedBy` (UUID, nullable)
+- `archivedAt` (LocalDateTime, nullable)
+- `createdAt` (LocalDateTime)
+- `updatedAt` (LocalDateTime)
+
+Enums:
+- `UserFeedbackCategory`: `BUG_REPORT`, `CONTENT_ISSUE`, `FEATURE_REQUEST`, `UX_FEEDBACK`, `GENERAL`
+- `UserFeedbackStatus`: `NEW`, `READ`, `ARCHIVED`
+
+Purpose:
+- Lưu góp ý/gợi ý/lỗi do user gửi lên
+- Đây là feedback chung cho sản phẩm, không gắn với entity cụ thể
+
+---
+
+## UserFeedbackAttachment (`user_feedback_attachments`)
+**Entity:** `com.learnapp.entities.UserFeedbackAttachment`
+
+Fields:
+- `id` (UUID)
+- `feedbackId` (UUID)
+- `storageKey` (String)
+- `fileName` (String)
+- `contentType` (String)
+- `fileSize` (Long)
+- `position` (Integer, nullable)
+- `createdAt` (LocalDateTime)
+
+Purpose:
+- Lưu metadata cho ảnh đính kèm của feedback
+- File ảnh thực tế được upload lên MinIO; DB không lưu binary/blob trực tiếp
+
+---
+
 ## Related Non-Entity Objects Added
 
-Các object sau không phải JPA entity nhưng vừa được thêm để hỗ trợ audio:
+Các object sau không phải JPA entity nhưng vừa được thêm để hỗ trợ audio/feedback:
 
 - `com.learnapp.dto.VocabularyAudioResponse`
 - `com.learnapp.dto.VocabularyAudioBackfillResponse`
 - `com.learnapp.service.VocabularyAudioService`
 - `com.learnapp.service.VocabularyAudioStorageService`
 - `com.learnapp.config.TextToSpeechProperties`
+- `com.learnapp.dto.UserFeedbackResponse`
+- `com.learnapp.dto.AdminUserFeedbackQueueItemResponse`
+- `com.learnapp.dto.AdminUserFeedbackDetailResponse`
+- `com.learnapp.service.UserFeedbackService`
+- `com.learnapp.service.UserFeedbackAttachmentStorageService`

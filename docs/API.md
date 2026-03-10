@@ -152,6 +152,60 @@ Trong đó `content` là danh sách object `T`.
 - `contribution` (`VocabularyContributionResponse`)
 - `reviewLogs` (`VocabularyContributionReviewLogResponse[]`)
 
+### `UserFeedbackAttachmentResponse`
+- `id` (`uuid`)
+- `fileName` (`string`)
+- `contentType` (`string`)
+- `fileSize` (`number`)
+- `position` (`number | null`)
+- `fileUrl` (`string`) - URL public của ảnh đã upload lên MinIO
+
+### `UserFeedbackResponse`
+- `id` (`uuid`)
+- `category` (`BUG_REPORT | CONTENT_ISSUE | FEATURE_REQUEST | UX_FEEDBACK | GENERAL`)
+- `title` (`string`)
+- `message` (`string`)
+- `status` (`NEW | READ | ARCHIVED`)
+- `sourceScreen` (`string | null`)
+- `appVersion` (`string | null`)
+- `deviceInfo` (`string | null`)
+- `locale` (`string | null`)
+- `attachments` (`UserFeedbackAttachmentResponse[]`)
+- `createdAt` (`datetime`)
+- `updatedAt` (`datetime`)
+
+### `AdminUserFeedbackQueueItemResponse`
+- `id` (`uuid`)
+- `userId` (`uuid`)
+- `userDisplayName` (`string | null`)
+- `category` (`BUG_REPORT | CONTENT_ISSUE | FEATURE_REQUEST | UX_FEEDBACK | GENERAL`)
+- `title` (`string`)
+- `status` (`NEW | READ | ARCHIVED`)
+- `attachmentCount` (`number`)
+- `createdAt` (`datetime`)
+
+### `AdminUserFeedbackDetailResponse`
+- `id` (`uuid`)
+- `userId` (`uuid`)
+- `userDisplayName` (`string | null`)
+- `category` (`BUG_REPORT | CONTENT_ISSUE | FEATURE_REQUEST | UX_FEEDBACK | GENERAL`)
+- `title` (`string`)
+- `message` (`string`)
+- `status` (`NEW | READ | ARCHIVED`)
+- `sourceScreen` (`string | null`)
+- `appVersion` (`string | null`)
+- `deviceInfo` (`string | null`)
+- `locale` (`string | null`)
+- `readBy` (`uuid | null`)
+- `readByDisplayName` (`string | null`)
+- `readAt` (`datetime | null`)
+- `archivedBy` (`uuid | null`)
+- `archivedByDisplayName` (`string | null`)
+- `archivedAt` (`datetime | null`)
+- `attachments` (`UserFeedbackAttachmentResponse[]`)
+- `createdAt` (`datetime`)
+- `updatedAt` (`datetime`)
+
 ### `UserVocabularyResponse`
 - `vocabularyId` (`uuid`)
 - `term` (`string | null`)
@@ -384,6 +438,49 @@ Query:
 - `page`, `size`, `sort` (mặc định nên dùng `sort=createdAt,desc`)
 
 Response `200` (`Page<UserActivityLogResponse>`)
+
+---
+
+## Feedback
+
+### `POST /feedback` (Auth)
+Submit a new user feedback entry. Hỗ trợ ảnh đính kèm và upload ảnh lên MinIO; DB chỉ lưu metadata + `storageKey`.
+
+Content-Type:
+- `multipart/form-data`
+
+Form-data:
+- `category` (required: `BUG_REPORT|CONTENT_ISSUE|FEATURE_REQUEST|UX_FEEDBACK|GENERAL`)
+- `title` (optional, max `120`)
+- `message` (required, max `4000`)
+- `sourceScreen` (optional, max `120`)
+- `appVersion` (optional, max `50`)
+- `deviceInfo` (optional, max `500`)
+- `locale` (optional, max `20`)
+- `attachments` (optional, repeatable image files)
+
+Validation:
+- max `3` attachments
+- max size per file: `5MB`
+- allowed types: `image/jpeg`, `image/png`, `image/webp`
+
+Response `200` (`UserFeedbackResponse`)
+
+Common errors:
+- `400 INVALID_MESSAGE`
+- `400 TOO_MANY_ATTACHMENTS`
+- `400 INVALID_FILE`
+- `400 FILE_TOO_LARGE`
+- `400 INVALID_FILE_TYPE`
+- `500 FEEDBACK_ATTACHMENT_UPLOAD_FAILED`
+
+### `GET /me/feedback` (Auth)
+List feedback submitted by current user.
+
+Query:
+- `page`, `size`, `sort`
+
+Response `200` (`Page<UserFeedbackResponse>`)
 
 ---
 
@@ -1001,6 +1098,38 @@ curl -X POST "http://localhost:8080/admin/vocab/audio/backfill?language=en&statu
 Soft delete vocabulary.
 
 Response `204 No Content`
+
+---
+
+## Admin Feedback (Admin)
+
+### `GET /admin/feedback`
+List feedback items for admin inbox.
+
+Query:
+- `query` (optional: search by title/message)
+- `status` (optional: `NEW|READ|ARCHIVED`)
+- `category` (optional: `BUG_REPORT|CONTENT_ISSUE|FEATURE_REQUEST|UX_FEEDBACK|GENERAL`)
+- `page`, `size`, `sort`
+
+Response `200` (`Page<AdminUserFeedbackQueueItemResponse>`)
+
+### `GET /admin/feedback/{id}`
+Get full detail of a feedback item.
+
+Response `200` (`AdminUserFeedbackDetailResponse`)
+
+### `PATCH /admin/feedback/{id}/read`
+Mark feedback as read in admin inbox.
+
+Response `200` (`AdminUserFeedbackDetailResponse`)
+Note: idempotent; nếu item đã `READ` hoặc `ARCHIVED`, API vẫn trả trạng thái hiện tại.
+
+### `PATCH /admin/feedback/{id}/archive`
+Archive a feedback item.
+
+Response `200` (`AdminUserFeedbackDetailResponse`)
+Note: nếu item chưa có `readAt`, API sẽ set `readBy/readAt` cùng lúc trước khi archive.
 
 ---
 
