@@ -16,8 +16,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ public class UserVocabularyService {
     private final VocabularyAudioService vocabularyAudioService;
     private final SpacedRepetitionService spacedRepetitionService;
     private final UserActivityLogService userActivityLogService;
+    private final TopicService topicService;
 
     public UserVocabularyService(
             UserVocabularyRepository userVocabularyRepository,
@@ -39,7 +42,8 @@ public class UserVocabularyService {
             UserRepository userRepository,
             VocabularyAudioService vocabularyAudioService,
             SpacedRepetitionService spacedRepetitionService,
-            UserActivityLogService userActivityLogService
+            UserActivityLogService userActivityLogService,
+            TopicService topicService
     ) {
         this.userVocabularyRepository = userVocabularyRepository;
         this.vocabularyRepository = vocabularyRepository;
@@ -47,20 +51,26 @@ public class UserVocabularyService {
         this.vocabularyAudioService = vocabularyAudioService;
         this.spacedRepetitionService = spacedRepetitionService;
         this.userActivityLogService = userActivityLogService;
+        this.topicService = topicService;
     }
 
     @Transactional(readOnly = true)
-    public Page<UserVocabulary> list(UUID userId, UserVocabStatus status, Pageable pageable) {
+    public Page<UserVocabulary> list(UUID userId, UserVocabStatus status, UUID topicId, Pageable pageable) {
         ensureUserNotDeleted(userId);
-        if (status == null) {
-            return userVocabularyRepository.findByUserId(userId, pageable);
+        Pageable normalizedPageable = normalizePageable(pageable);
+        if (topicId != null) {
+            topicService.getActiveById(topicId);
+            return userVocabularyRepository.findByUserIdAndTopicIdAndStatus(userId, topicId, status, normalizedPageable);
         }
-        return userVocabularyRepository.findByUserIdAndStatus(userId, status, pageable);
+        if (status == null) {
+            return userVocabularyRepository.findByUserId(userId, normalizedPageable);
+        }
+        return userVocabularyRepository.findByUserIdAndStatus(userId, status, normalizedPageable);
     }
 
     @Transactional(readOnly = true)
-    public Page<UserVocabularyResponse> listResponses(UUID userId, UserVocabStatus status, Pageable pageable) {
-        Page<UserVocabulary> page = list(userId, status, pageable);
+    public Page<UserVocabularyResponse> listResponses(UUID userId, UserVocabStatus status, UUID topicId, Pageable pageable) {
+        Page<UserVocabulary> page = list(userId, status, topicId, pageable);
         List<UUID> vocabularyIds = page.stream().map(UserVocabulary::getVocabularyId).toList();
         Map<UUID, String> termsByVocabId = loadTerms(vocabularyIds);
         Map<UUID, List<VocabularyAudioResponse>> audiosByVocabId = vocabularyAudioService.loadAudioResponses(vocabularyIds);
@@ -192,6 +202,22 @@ public class UserVocabularyService {
             return;
         }
         userVocabulary.setStatus(UserVocabStatus.NEW);
+    }
+
+    private Pageable normalizePageable(Pageable pageable) {
+        if (pageable == null || pageable.isUnpaged() || pageable.getSort().isUnsorted()) {
+            return pageable;
+        }
+        boolean needsNormalization = pageable.getSort().stream().anyMatch(order -> "progress".equals(order.getProperty()));
+        if (!needsNormalization) {
+            return pageable;
+        }
+        Sort normalizedSort = Sort.by(pageable.getSort().stream()
+                .map(order -> "progress".equals(order.getProperty())
+                        ? new Sort.Order(order.getDirection(), "process")
+                        : order)
+                .toList());
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), normalizedSort);
     }
 
     private Map<UUID, String> loadTerms(List<UUID> vocabularyIds) {

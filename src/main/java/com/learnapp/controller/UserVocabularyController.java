@@ -61,9 +61,10 @@ public class UserVocabularyController {
     public Page<UserVocabularyResponse> list(
             @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(required = false) UserVocabStatus status,
+            @RequestParam(required = false) UUID topicId,
             @ParameterObject Pageable pageable
     ) {
-        return userVocabularyService.listResponses(principal.id(), status, pageable);
+        return userVocabularyService.listResponses(principal.id(), status, topicId, pageable);
     }
 
     @Operation(summary = "Get my flashcards", description = "Build a flashcard deck from the user's vocabulary list.")

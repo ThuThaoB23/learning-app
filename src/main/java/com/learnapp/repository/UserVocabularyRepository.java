@@ -10,6 +10,8 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface UserVocabularyRepository extends JpaRepository<UserVocabulary, UUID> {
     Optional<UserVocabulary> findByIdAndUserId(UUID id, UUID userId);
@@ -35,4 +37,23 @@ public interface UserVocabularyRepository extends JpaRepository<UserVocabulary, 
     List<UserVocabulary> findByUserIdAndProcessLessThanEqual(UUID userId, Integer threshold);
 
     List<UserVocabulary> findByUserIdAndLastReviewedAtIsNull(UUID userId);
+
+    @Query("""
+            select uv
+            from UserVocabulary uv
+            where uv.userId = :userId
+              and (:status is null or uv.status = :status)
+              and exists (
+                    select 1
+                    from TopicVocabulary tv
+                    where tv.topicId = :topicId
+                      and tv.vocabularyId = uv.vocabularyId
+              )
+            """)
+    Page<UserVocabulary> findByUserIdAndTopicIdAndStatus(
+            @Param("userId") UUID userId,
+            @Param("topicId") UUID topicId,
+            @Param("status") UserVocabStatus status,
+            Pageable pageable
+    );
 }

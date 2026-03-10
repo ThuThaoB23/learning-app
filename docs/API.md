@@ -654,10 +654,15 @@ List user vocab list.
 
 Query:
 - `status` (optional: `NEW|LEARNING|MASTERED`)
+- `topicId` (optional, `uuid`) - chỉ trả về các từ trong My Vocab đang được gắn với topic này
 - `page`, `size`, `sort`
 
 Response `200` (`Page<UserVocabularyResponse>`)
 Note: `UserVocabularyResponse` includes `term` and `audios`.
+Notes:
+- `topicId` có thể dùng cùng với `status`.
+- Hỗ trợ sort theo `progress` bằng `sort=progress,asc|desc`.
+- Nếu `topicId` không tồn tại hoặc topic đang `INACTIVE`, API trả `404 TOPIC_NOT_FOUND`.
 
 ### `GET /me/vocab/flashcards` (Auth)
 Build a flashcard deck from current user's my-vocab list.
